@@ -20,17 +20,21 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
       - name: Unzip Android project
         run: |
           ZIP=$(find . -maxdepth 1 -name "MyUnitCalendar-Android-*.zip" | head -n 1)
+          echo "ZIP found: $ZIP"
           unzip -o "$ZIP" -d extracted
-          ls -la extracted
 
       - name: Build APK
         run: |
           cd extracted/MyUnitCalendar-Android
-          chmod +x gradlew
-          ./gradlew assembleDebug
+          gradle assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
