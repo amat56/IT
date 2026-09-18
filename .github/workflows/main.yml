@@ -1,1 +1,39 @@
+name: Build Android APK
 
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Unzip Android project
+        run: |
+          ZIP=$(find . -maxdepth 1 -name "MyUnitCalendar-Android-*.zip" | head -n 1)
+          unzip -o "$ZIP" -d extracted
+          ls -la extracted
+
+      - name: Build APK
+        run: |
+          cd extracted/MyUnitCalendar-Android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MyUnitCalendar-APK
+          path: extracted/MyUnitCalendar-Android/app/build/outputs/apk/debug/app-debug.apk
