@@ -61,3 +61,32 @@ Cadangan penggunaan:
 - `scope=federal` untuk cuti Persekutuan.
 - `scope=state` untuk cuti negeri.
 - `scope=internal` untuk cuti khas jabatan/organisasi.
+
+
+## v6.3 - Tambah Staf dari APK
+
+Run:
+`migration_v6_3_add_staff.sql`
+
+Kemudian deploy Edge Function:
+`supabase/functions/admin-create-user/index.ts`
+
+Function secrets yang diperlukan:
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+PENTING:
+- Jangan letak service-role key dalam APK.
+- Edge Function menyemak bahawa pengguna semasa mempunyai `profiles.role = 'admin'`.
+
+Demo mode:
+- Butang `+ Tambah Staf` berfungsi terus menggunakan data local.
+
+
+## v6.4
+Run `migration_v6_4_admin_full_control.sql`.
+Deploy Edge Functions:
+- `admin-create-user`
+- `admin-delete-user`
+Service role hanya disimpan sebagai Edge Function secret, bukan dalam APK.
