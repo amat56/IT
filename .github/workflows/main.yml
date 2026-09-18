@@ -1,4 +1,4 @@
-name: Build Android APK v6.7
+name: Build Android APK v6.7c
 
 on:
   workflow_dispatch:
@@ -25,18 +25,18 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Unzip v6.7 project
+      - name: Unzip v6.7c project
         run: |
-          unzip -o MyUnitCalendar-Android-v6_7-Supabase-Project.zip -d extracted
+          unzip -o MyUnitCalendar-Android-v6_7c-Supabase-Project.zip -d extracted
           ls -la extracted
 
-      - name: Build APK v6.7
+      - name: Build APK v6.7c
         run: |
-          cd extracted/MyUnitCalendar-Android-v6_7
+          cd extracted/MyUnitCalendar-Android-v6_7c
           gradle assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: MyUnitCalendar-v6_7-APK
-          path: extracted/MyUnitCalendar-Android-v6_7/app/build/outputs/apk/debug/app-debug.apk
+          name: MyUnitCalendar-v6_7c-APK
+          path: extracted/MyUnitCalendar-Android-v6_7c/app/build/outputs/apk/debug/app-debug.apk
