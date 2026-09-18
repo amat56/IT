@@ -1,4 +1,4 @@
-name: Build Android APK v6.8
+name: Build Android APK AVIA v6.9
 
 on:
   workflow_dispatch:
@@ -25,18 +25,18 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Unzip v6.8 project
+      - name: Unzip AVIA v6.9 project
         run: |
-          unzip -o MyUnitCalendar-Android-v6_8-Supabase-Project.zip -d extracted
+          unzip -o AVIA-Android-v6_9-Supabase-Project.zip -d extracted
           ls -la extracted
 
-      - name: Build APK v6.8
+      - name: Build AVIA v6.9
         run: |
-          cd extracted/MyUnitCalendar-Android-v6_8
+          cd extracted/AVIA-Android-v6_9
           gradle assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: MyUnitCalendar-v6_8-APK
-          path: extracted/MyUnitCalendar-Android-v6_8/app/build/outputs/apk/debug/app-debug.apk
+          name: AVIA-v6_9-APK
+          path: extracted/AVIA-Android-v6_9/app/build/outputs/apk/debug/app-debug.apk
