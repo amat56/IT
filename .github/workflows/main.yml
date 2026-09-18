@@ -27,4 +27,16 @@ jobs:
 
       - name: Unzip v6.4b project
         run: |
-          ZIP=$(find . -maxdepth 1 -name "MyUnitCalendar-Android-v6_
+          unzip -o MyUnitCalendar-Android-v6_4b-Supabase-Project.zip -d extracted
+          ls -la extracted
+
+      - name: Build APK v6.4b
+        run: |
+          cd extracted/MyUnitCalendar-Android-v6_4b
+          gradle assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MyUnitCalendar-v6_4b-APK
+          path: extracted/MyUnitCalendar-Android-v6_4b/app/build/outputs/apk/debug/app-debug.apk
