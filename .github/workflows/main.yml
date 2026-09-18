@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android APK v5
 
 on:
   workflow_dispatch:
@@ -25,19 +25,20 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Unzip Android project
+      - name: Unzip v5 project
         run: |
-          ZIP=$(find . -maxdepth 1 -name "MyUnitCalendar-Android-*.zip" | head -n 1)
+          ZIP=$(find . -maxdepth 1 -name "MyUnitCalendar-Android-v5-Project.zip" | head -n 1)
           echo "ZIP found: $ZIP"
           unzip -o "$ZIP" -d extracted
+          find extracted -maxdepth 3 -type f | head -50
 
-      - name: Build APK
+      - name: Build APK v5
         run: |
-          cd extracted/MyUnitCalendar-Android
+          cd extracted/MyUnitCalendar-Android-v5
           gradle assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: MyUnitCalendar-APK
-          path: extracted/MyUnitCalendar-Android/app/build/outputs/apk/debug/app-debug.apk
+          name: MyUnitCalendar-v5-APK
+          path: extracted/MyUnitCalendar-Android-v5/app/build/outputs/apk/debug/app-debug.apk
