@@ -1,4 +1,4 @@
-name: Build Android APK AVIA v6.9ad
+name: Build Android APK AVIA v6.9af
 
 on:
   workflow_dispatch:
@@ -25,18 +25,18 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Unzip AVIA v6.9ad project
+      - name: Unzip AVIA v6.9af project
         run: |
-          unzip -o AVIA-Android-v6_9ad-MenuButtonFix-Project.zip -d extracted
+          unzip -o AVIA-Android-v6_9af-AdminConfigRecovery-Project.zip -d extracted
           ls -la extracted
 
-      - name: Build AVIA v6.9ad
+      - name: Build AVIA v6.9af
         run: |
-          cd extracted/AVIA-Android-v6_9ad
+          cd extracted/AVIA-Android-v6_9af
           gradle assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AVIA-v6_9ad-APK
-          path: extracted/AVIA-Android-v6_9ad/app/build/outputs/apk/debug/app-debug.apk
+          name: AVIA-v6_9af-APK
+          path: extracted/AVIA-Android-v6_9af/app/build/outputs/apk/debug/app-debug.apk
