@@ -1,4 +1,4 @@
-name: Build Android APK AVIA v6.9bk
+name: Build Android APK AVIA v6.9bi
 
 on:
   workflow_dispatch:
@@ -9,34 +9,28 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-
-      - name: Unzip AVIA v6.9bk project
+      - name: Unzip AVIA v6.9bi project
         run: |
-          unzip -o AVIA-Android-v6_9bk-Font8-PrayerBelowQuick-Project.zip -d extracted
+          unzip -o AVIA-Android-v6_9bi-PrayerActiveHighlight-Project.zip -d extracted
           ls -la extracted
-
-      - name: Build AVIA v6.9bk
+      - name: Build AVIA v6.9bi
         run: |
-          cd extracted/AVIA-Android-v6_9bk
+          cd extracted/AVIA-Android-v6_9bi
           gradle assembleDebug
-
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AVIA-v6_9bk-APK
-          path: extracted/AVIA-Android-v6_9bk/app/build/outputs/apk/debug/app-debug.apk
+          name: AVIA-v6_9bi-APK
+          path: extracted/AVIA-Android-v6_9bi/app/build/outputs/apk/debug/app-debug.apk
