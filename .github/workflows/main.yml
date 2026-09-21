@@ -9,28 +9,54 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+
+      - name: Remove old extracted folder
+        run: |
+          rm -rf extracted
+          mkdir -p extracted
+
       - name: Unzip AVIA v6.9bi project
         run: |
           unzip -o AVIA-Android-v6_9bi-PrayerActiveHighlight-Project.zip -d extracted
-          ls -la extracted
+          echo "=== Extracted files ==="
+          find extracted -maxdepth 3 -type f | sort | head -100
+
+      - name: Verify AVIA v6.9bi source
+        run: |
+          echo "=== Checking index.html ==="
+          grep -n "AVIA v6.9bi" extracted/AVIA-Android-v6_9bi/app/src/main/assets/index.html || true
+          echo "=== Checking UNIT IT / Header ==="
+          grep -n "UNIT IT" extracted/AVIA-Android-v6_9bi/app/src/main/assets/index.html | head -20 || true
+          echo "=== Checking Prayer Active Highlight ==="
+          grep -n "active-prayer" extracted/AVIA-Android-v6_9bi/app/src/main/assets/index.html | head -20 || true
+
       - name: Build AVIA v6.9bi
         run: |
           cd extracted/AVIA-Android-v6_9bi
-          gradle assembleDebug
+          gradle clean assembleDebug
+
+      - name: Rename APK
+        run: |
+          cp extracted/AVIA-Android-v6_9bi/app/build/outputs/apk/debug/app-debug.apk AVIA-v6_9bi-debug.apk
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: AVIA-v6_9bi-APK
-          path: extracted/AVIA-Android-v6_9bi/app/build/outputs/apk/debug/app-debug.apk
+          path: AVIA-v6_9bi-debug.apk
+          if-no-files-found: error
