@@ -24,23 +24,33 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Extract final project
+      - name: Extract proven v6.9bi source
         run: |
-          rm -rf extracted
+          rm -rf extracted overlay.b64 overlay.tar.xz
           mkdir -p extracted
-          unzip -o AVIA-Android-v6_9bi-SupabaseLive-FINAL.zip -d extracted
-          test -f extracted/AVIA-Android-v6_9bi-SupabaseLive/app/src/main/assets/index.html
-          grep -q "AVIA_SUPABASE_FIXED" extracted/AVIA-Android-v6_9bi-SupabaseLive/app/src/main/assets/index.html
-          grep -q "hdfshop2010@gmail.com" extracted/AVIA-Android-v6_9bi-SupabaseLive/app/src/main/assets/index.html
+          unzip -o AVIA-Android-v6_9bi-PrayerActiveHighlight-Project.zip -d extracted
+          test -f extracted/AVIA-Android-v6_9bi/app/src/main/assets/index.html
+
+      - name: Apply Supabase Live overlay
+        run: |
+          cat live_overlay/overlay.part00 live_overlay/overlay.part01 live_overlay/overlay.part02 live_overlay/overlay.part03 live_overlay/overlay.part04 live_overlay/overlay.part05 > overlay.b64
+          base64 -d overlay.b64 > overlay.tar.xz
+          tar -xJf overlay.tar.xz -C extracted/AVIA-Android-v6_9bi
+          grep -q "AVIA_SUPABASE_FIXED" extracted/AVIA-Android-v6_9bi/app/src/main/assets/index.html
+          grep -q "AVIA_STAFF_TEMP_PASSWORD" extracted/AVIA-Android-v6_9bi/app/src/main/assets/index.html
+          grep -q "hdfshop2010@gmail.com" extracted/AVIA-Android-v6_9bi/app/src/main/assets/index.html
+          grep -q 'versionName "6.9bi-live"' extracted/AVIA-Android-v6_9bi/app/build.gradle
 
       - name: Build APK
         run: |
-          cd extracted/AVIA-Android-v6_9bi-SupabaseLive
+          cd extracted/AVIA-Android-v6_9bi
           gradle clean assembleDebug
 
-      - name: Prepare APK
+      - name: Verify and rename APK
         run: |
-          cp extracted/AVIA-Android-v6_9bi-SupabaseLive/app/build/outputs/apk/debug/app-debug.apk AVIA-v6_9bi-SupabaseLive.apk
+          test -f extracted/AVIA-Android-v6_9bi/app/build/outputs/apk/debug/app-debug.apk
+          cp extracted/AVIA-Android-v6_9bi/app/build/outputs/apk/debug/app-debug.apk AVIA-v6_9bi-SupabaseLive.apk
+          unzip -t AVIA-v6_9bi-SupabaseLive.apk >/dev/null
           sha256sum AVIA-v6_9bi-SupabaseLive.apk
 
       - name: Upload APK
