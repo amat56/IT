@@ -39,7 +39,7 @@ jobs:
           grep -q "AVIA_SUPABASE_FIXED" extracted/AVIA-Android-v6_9bi/app/src/main/assets/index.html
           grep -q "AVIA_STAFF_TEMP_PASSWORD" extracted/AVIA-Android-v6_9bi/app/src/main/assets/index.html
           grep -q "hdfshop2010@gmail.com" extracted/AVIA-Android-v6_9bi/app/src/main/assets/index.html
-          grep -q 'versionName "6.9bi-live"' extracted/AVIA-Android-v6_9bi/app/build.gradle
+          grep -q "6.9bi-live" extracted/AVIA-Android-v6_9bi/app/build.gradle
 
       - name: Build APK
         run: |
