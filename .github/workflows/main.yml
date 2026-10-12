@@ -1,62 +1,51 @@
-name: Build Android APK AVIA v6.9bi
+name: Build AVIA Supabase Live APK
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - main
+      - avia-v6_9bi-supabase-live
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle
+      - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      - name: Remove old extracted folder
+      - name: Extract final project
         run: |
           rm -rf extracted
           mkdir -p extracted
+          unzip -o AVIA-Android-v6_9bi-SupabaseLive-FINAL.zip -d extracted
+          test -f extracted/AVIA-Android-v6_9bi-SupabaseLive/app/src/main/assets/index.html
+          grep -q "AVIA_SUPABASE_FIXED" extracted/AVIA-Android-v6_9bi-SupabaseLive/app/src/main/assets/index.html
+          grep -q "hdfshop2010@gmail.com" extracted/AVIA-Android-v6_9bi-SupabaseLive/app/src/main/assets/index.html
 
-      - name: Unzip AVIA v6.9bi project
+      - name: Build APK
         run: |
-          unzip -o AVIA-Android-v6_9bi-PrayerActiveHighlight-Project.zip -d extracted
-          echo "=== Extracted files ==="
-          find extracted -maxdepth 3 -type f | sort | head -100
-
-      - name: Verify AVIA v6.9bi source
-        run: |
-          echo "=== Checking index.html ==="
-          grep -n "AVIA v6.9bi" extracted/AVIA-Android-v6_9bi/app/src/main/assets/index.html || true
-          echo "=== Checking UNIT IT / Header ==="
-          grep -n "UNIT IT" extracted/AVIA-Android-v6_9bi/app/src/main/assets/index.html | head -20 || true
-          echo "=== Checking Prayer Active Highlight ==="
-          grep -n "active-prayer" extracted/AVIA-Android-v6_9bi/app/src/main/assets/index.html | head -20 || true
-
-      - name: Build AVIA v6.9bi
-        run: |
-          cd extracted/AVIA-Android-v6_9bi
+          cd extracted/AVIA-Android-v6_9bi-SupabaseLive
           gradle clean assembleDebug
 
-      - name: Rename APK
+      - name: Prepare APK
         run: |
-          cp extracted/AVIA-Android-v6_9bi/app/build/outputs/apk/debug/app-debug.apk AVIA-v6_9bi-debug.apk
+          cp extracted/AVIA-Android-v6_9bi-SupabaseLive/app/build/outputs/apk/debug/app-debug.apk AVIA-v6_9bi-SupabaseLive.apk
+          sha256sum AVIA-v6_9bi-SupabaseLive.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AVIA-v6_9bi-APK
-          path: AVIA-v6_9bi-debug.apk
+          name: AVIA-v6_9bi-SupabaseLive-APK
+          path: AVIA-v6_9bi-SupabaseLive.apk
           if-no-files-found: error
