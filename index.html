@@ -1885,7 +1885,7 @@ function kpiTitle(type){
 function openKpiDetails(type){
   const dayState=todayDateState();
   const groups=todayKpiGroups();
-  const arr=groups[type]||[];
+  const arr=sortAviaStaff(groups[type]||[]);
   const title=kpiTitle(type);
   g('kpiDetailTitle').textContent=title;
   g('kpiDetailCount').textContent=arr.length+' staf';
