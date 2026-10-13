@@ -70,7 +70,7 @@ jobs:
           }
           EOF
           cat > web/sw.js <<'EOF'
-          const CACHE='avia-web-v2';
+          const CACHE='avia-web-v3';
           const SHELL=['./','./index.html','./manifest.webmanifest','./offline.html','./icons/icon-512.png'];
           self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting())));
           self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
@@ -94,7 +94,7 @@ jobs:
           grep -q 'hdfshop2010@gmail.com' web/index.html
           grep -q 'installPwaBtn' web/index.html
           grep -q 'serviceWorker' web/index.html
-          grep -q 'avia-web-v2' web/sw.js
+          grep -q 'avia-web-v3' web/sw.js
           python3 -m json.tool web/manifest.webmanifest >/dev/null
           python3 -m json.tool web/vercel.json >/dev/null
           test -s web/index.html
@@ -137,6 +137,50 @@ jobs:
           PY
           grep -q 'AVIA_STAFF_DISPLAY_ORDER' web/index.html
           grep -q "const people=sortAviaStaff(groups\[u\])" web/index.html
+
+      - name: Harden mobile login network retry
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('web/index.html')
+          s=p.read_text(encoding='utf-8')
+          marker='async function loginRemote(){'
+          if marker not in s: raise SystemExit('loginRemote marker not found')
+          patch="""const AVIA_MOBILE_FETCH_RETRY=true;
+          const _aviaApiFetchBase=api;
+          api=async function(path,opt={}){
+            const method=String(opt.method||'GET').toUpperCase();
+            const attempts=method==='GET'?3:1;
+            let last=null;
+            for(let i=1;i<=attempts;i++){
+              try{return await _aviaApiFetchBase(path,opt)}catch(e){
+                last=e;
+                const transient=/failed to fetch|networkerror|load failed|network request failed/i.test(String(e?.message||e));
+                if(!transient||i===attempts){
+                  if(transient)throw new Error('Sambungan ke server terganggu. Sila cuba lagi.');
+                  throw e;
+                }
+                await new Promise(r=>setTimeout(r,350*i));
+              }
+            }
+            throw last;
+          };
+          const _aviaLoginRemoteBase=loginRemote;
+          let AVIA_LOGIN_PROMISE=null;
+          loginRemote=async function(){
+            if(AVIA_LOGIN_PROMISE)return AVIA_LOGIN_PROMISE;
+            AVIA_LOGIN_PROMISE=_aviaLoginRemoteBase();
+            try{return await AVIA_LOGIN_PROMISE}finally{AVIA_LOGIN_PROMISE=null}
+          };
+          """
+          if 'AVIA_MOBILE_FETCH_RETRY' not in s:
+              s=s.replace(marker,patch+marker,1)
+          p.write_text(s,encoding='utf-8')
+          PY
+          grep -q 'AVIA_MOBILE_FETCH_RETRY=true' web/index.html
+          grep -q 'AVIA_LOGIN_PROMISE' web/index.html
 
       - name: Upload web package
         uses: actions/upload-artifact@v4
