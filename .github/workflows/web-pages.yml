@@ -1,0 +1,100 @@
+name: Deploy AVIA Web PWA
+
+on:
+  push:
+    branches:
+      - avia-web-pwa
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: avia-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build AVIA web files from verified live source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf extracted web overlay.b64 overlay.tar.xz
+          mkdir -p extracted web
+          unzip -o AVIA-Android-v6_9bi-PrayerActiveHighlight-Project.zip -d extracted >/dev/null
+          cat live_overlay/overlay.part00 live_overlay/overlay.part01 live_overlay/overlay.part02 live_overlay/overlay.part03 live_overlay/overlay.part04 live_overlay/overlay.part05 > overlay.b64
+          base64 -d overlay.b64 > overlay.tar.xz
+          tar -xJf overlay.tar.xz -C extracted/AVIA-Android-v6_9bi
+          cp extracted/AVIA-Android-v6_9bi/app/src/main/assets/index.html web/index.html
+          mkdir -p web/icons
+          cp extracted/AVIA-Android-v6_9bi/app/src/main/res/drawable-nodpi/avia_launcher.png web/icons/icon-512.png
+          cp web/icons/icon-512.png web/icons/icon-192.png
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('web/index.html')
+          s=p.read_text(encoding='utf-8')
+          meta='''\n<link rel="manifest" href="manifest.webmanifest">\n<meta name="theme-color" content="#0b5ea8">\n<meta name="apple-mobile-web-app-capable" content="yes">\n<meta name="apple-mobile-web-app-status-bar-style" content="default">\n<meta name="apple-mobile-web-app-title" content="AVIA">\n<link rel="icon" type="image/png" href="icons/icon-512.png">\n<link rel="apple-touch-icon" href="icons/icon-512.png">\n'''
+          if 'manifest.webmanifest' not in s:
+              s=s.replace('<head>','<head>'+meta,1)
+          needle='<button id="loginBtn">Log Masuk</button>'
+          if 'installPwaBtn' not in s and needle in s:
+              s=s.replace(needle,needle+'<button id="installPwaBtn" type="button" class="alt hidden" style="margin-left:8px">Install AVIA</button>',1)
+          script='''\n<script>\n(function(){\nlet promptEvent=null;const b=()=>document.getElementById('installPwaBtn');\nconst standalone=()=>window.matchMedia?.('(display-mode: standalone)').matches||window.navigator.standalone===true;\nwindow.addEventListener('beforeinstallprompt',e=>{e.preventDefault();promptEvent=e;if(!standalone())b()?.classList.remove('hidden');});\nwindow.addEventListener('appinstalled',()=>{promptEvent=null;b()?.classList.add('hidden');});\ndocument.addEventListener('click',async e=>{if(e.target?.id!=='installPwaBtn')return;if(promptEvent){promptEvent.prompt();try{await promptEvent.userChoice}catch(_){}promptEvent=null;b()?.classList.add('hidden');}else alert('Dalam Chrome/Edge: buka menu browser dan pilih Install AVIA / Install app.');});\nif('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));\nif(standalone())b()?.classList.add('hidden');\n})();\n</script>\n'''
+          if "navigator.serviceWorker.register('./sw.js')" not in s:
+              s=s.replace('</body>',script+'</body>',1)
+          p.write_text(s,encoding='utf-8')
+          PY
+          cat > web/manifest.webmanifest <<'EOF'
+          {
+            "name": "AVIA — Availability & Visibility Information Application",
+            "short_name": "AVIA",
+            "description": "AVIA UNIT IT — pergerakan staf, status, birthday, pengumuman dan pentadbiran.",
+            "start_url": "./",
+            "scope": "./",
+            "display": "standalone",
+            "background_color": "#ffffff",
+            "theme_color": "#0b5ea8",
+            "icons": [
+              {"src":"icons/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+            ]
+          }
+          EOF
+          cat > web/sw.js <<'EOF'
+          const CACHE='avia-web-v1';
+          const SHELL=['./','./index.html','./manifest.webmanifest','./offline.html','./icons/icon-512.png'];
+          self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting())));
+          self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
+          self.addEventListener('fetch',e=>{const u=new URL(e.request.url);if(u.hostname.endsWith('.supabase.co'))return;if(e.request.mode==='navigate'){e.respondWith(fetch(e.request).then(r=>{const c=r.clone();caches.open(CACHE).then(x=>x.put('./index.html',c));return r}).catch(()=>caches.match('./index.html').then(r=>r||caches.match('./offline.html'))));return;}e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));});
+          EOF
+          cat > web/offline.html <<'EOF'
+          <!doctype html><html lang="ms"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AVIA Offline</title><style>body{font-family:system-ui;margin:0;display:grid;place-items:center;min-height:100vh;background:#f4f7fb;color:#17324d}.box{max-width:520px;padding:28px;background:white;border-radius:18px;box-shadow:0 8px 30px #0001;text-align:center}</style><div class="box"><h1>AVIA</h1><p>Tiada sambungan internet. Buka semula apabila talian tersedia untuk sync data Supabase.</p></div></html>
+          EOF
+          touch web/.nojekyll
+          grep -q 'AVIA_SUPABASE_FIXED' web/index.html
+          grep -q 'hdfshop2010@gmail.com' web/index.html
+          grep -q 'installPwaBtn' web/index.html
+          grep -q 'serviceWorker' web/index.html
+          test -s web/manifest.webmanifest
+          test -s web/sw.js
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: web
+
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
