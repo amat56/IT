@@ -70,7 +70,7 @@ jobs:
           }
           EOF
           cat > web/sw.js <<'EOF'
-          const CACHE='avia-web-v3';
+          const CACHE='avia-web-v4';
           const SHELL=['./','./index.html','./manifest.webmanifest','./offline.html','./icons/icon-512.png'];
           self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting())));
           self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
@@ -94,7 +94,7 @@ jobs:
           grep -q 'hdfshop2010@gmail.com' web/index.html
           grep -q 'installPwaBtn' web/index.html
           grep -q 'serviceWorker' web/index.html
-          grep -q 'avia-web-v3' web/sw.js
+          grep -q 'avia-web-v4' web/sw.js
           python3 -m json.tool web/manifest.webmanifest >/dev/null
           python3 -m json.tool web/vercel.json >/dev/null
           test -s web/index.html
@@ -181,6 +181,62 @@ jobs:
           PY
           grep -q 'AVIA_MOBILE_FETCH_RETRY=true' web/index.html
           grep -q 'AVIA_LOGIN_PROMISE' web/index.html
+
+      - name: Fix forced password change action
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('web/index.html')
+          s=p.read_text(encoding='utf-8')
+          old_btn='<div class="actions" style="margin-top:12px"><button id="changeOwnPasswordBtn" type="button">Tukar Password</button></div>'
+          new_btn='<div class="actions" style="margin-top:12px"><button id="changeOwnPasswordBtn" type="button" onclick="changeOwnPassword()">Tukar Password</button></div><div id="forcePasswordMsg" class="muted" style="margin-top:8px"></div>'
+          if old_btn not in s: raise SystemExit('force password button marker not found')
+          s=s.replace(old_btn,new_btn,1)
+          old_bind="window.addEventListener('focus',()=>{if(TOKEN&&!demo)syncAll()});g('changeOwnPasswordBtn')?.addEventListener('click',changeOwnPassword);"
+          new_bind="window.addEventListener('focus',()=>{if(TOKEN&&!demo)syncAll()});"
+          if old_bind not in s: raise SystemExit('force password listener marker not found')
+          s=s.replace(old_bind,new_bind,1)
+          old_start="""async function changeOwnPassword(){
+  const p1=g('newOwnPassword').value,p2=g('confirmOwnPassword').value;
+  if(p1.length<8)return alert('Password baharu minimum 8 aksara.');
+  if(p1!==p2)return alert('Password tidak sepadan.');"""
+          new_start="""async function changeOwnPassword(){
+  const msg=g('forcePasswordMsg'),btn=g('changeOwnPasswordBtn');
+  const fail=t=>{if(msg)msg.textContent=t;else alert(t)};
+  if(msg)msg.textContent='';
+  const p1=g('newOwnPassword').value,p2=g('confirmOwnPassword').value;
+  if(p1.length<8)return fail('Password baharu minimum 8 aksara.');
+  if(p1!==p2)return fail('Password tidak sepadan.');"""
+          if old_start not in s: raise SystemExit('changeOwnPassword start marker not found')
+          s=s.replace(old_start,new_start,1)
+          old_try="""  try{
+    const r=await fetch(CFG.url.replace(/\\/$/,'')+'/auth/v1/user',{\n"""
+          new_try="""  try{
+    if(btn)btn.disabled=true;
+    if(msg)msg.textContent='Menyimpan password baharu...';
+    const r=await fetch(CFG.url.replace(/\\/$/,'')+'/auth/v1/user',{\n"""
+          if old_try not in s: raise SystemExit('changeOwnPassword fetch marker not found')
+          s=s.replace(old_try,new_try,1)
+          old_success="""    g('newOwnPassword').value='';g('confirmOwnPassword').value='';
+    alert('Password berjaya ditukar.');
+  }catch(e){alert(e.message)}
+}
+function enforcePasswordChange(){"""
+          new_success="""    g('newOwnPassword').value='';g('confirmOwnPassword').value='';
+    if(msg)msg.textContent='Password berjaya ditukar.';
+    alert('Password berjaya ditukar.');
+  }catch(e){fail(e.message||'Gagal tukar password.')}finally{if(btn)btn.disabled=false}
+}
+function enforcePasswordChange(){"""
+          if old_success not in s: raise SystemExit('changeOwnPassword completion marker not found')
+          s=s.replace(old_success,new_success,1)
+          p.write_text(s,encoding='utf-8')
+          PY
+          grep -q 'onclick="changeOwnPassword()"' web/index.html
+          grep -q 'Menyimpan password baharu' web/index.html
+          grep -q 'forcePasswordMsg' web/index.html
 
       - name: Upload web package
         uses: actions/upload-artifact@v4
