@@ -1,4 +1,4 @@
-name: Deploy AVIA Web PWA
+name: Build AVIA Web PWA
 
 on:
   push:
@@ -7,19 +7,14 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
-  group: avia-pages
+  group: avia-web-dist
   cancel-in-progress: true
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build-web:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -38,7 +33,6 @@ jobs:
           cp extracted/AVIA-Android-v6_9bi/app/src/main/assets/index.html web/index.html
           mkdir -p web/icons
           cp extracted/AVIA-Android-v6_9bi/app/src/main/res/drawable-nodpi/avia_launcher.png web/icons/icon-512.png
-          cp web/icons/icon-512.png web/icons/icon-192.png
           python3 - <<'PY'
           from pathlib import Path
           p=Path('web/index.html')
@@ -87,14 +81,24 @@ jobs:
           test -s web/manifest.webmanifest
           test -s web/sw.js
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v4
+      - name: Upload web package
+        uses: actions/upload-artifact@v4
         with:
+          name: AVIA-Web-PWA
           path: web
+          if-no-files-found: error
 
-      - name: Deploy Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Publish avia-web-dist branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -C web -czf /tmp/avia-web.tgz .
+          git config user.name "AVIA Build"
+          git config user.email "actions@github.com"
+          git checkout --orphan avia-web-dist
+          git rm -rf . || true
+          git clean -fdx
+          tar -xzf /tmp/avia-web.tgz
+          git add -A
+          git commit -m "Publish AVIA Web PWA"
+          git push --force origin HEAD:avia-web-dist
