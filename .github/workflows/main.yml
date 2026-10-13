@@ -69,10 +69,14 @@ jobs:
           old_today="return scopeStaff().filter(s=>(`${s.full_name||''} ${s.email||''}`).toLowerCase().includes(q));"
           if old_today not in s: raise SystemExit('today staff sort marker not found')
           s=s.replace(old_today,"return sortAviaStaff(scopeStaff().filter(s=>(`${s.full_name||''} ${s.email||''}`).toLowerCase().includes(q)));",1)
+          old_kpi="const arr=groups[type]||[];"
+          if old_kpi not in s: raise SystemExit('KPI detail sort marker not found')
+          s=s.replace(old_kpi,"const arr=sortAviaStaff(groups[type]||[]);",1)
           p.write_text(s,encoding='utf-8')
           PY
           grep -q "AVIA_STAFF_DISPLAY_ORDER" extracted/AVIA-Android-v6_9bi/app/src/main/assets/index.html
           grep -q "const people=sortAviaStaff(groups\[u\])" extracted/AVIA-Android-v6_9bi/app/src/main/assets/index.html
+          grep -Fq "const arr=sortAviaStaff(groups[type]||[]);" extracted/AVIA-Android-v6_9bi/app/src/main/assets/index.html
 
       - name: Build APK
         run: |
