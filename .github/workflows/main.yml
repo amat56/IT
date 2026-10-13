@@ -41,6 +41,39 @@ jobs:
           grep -q "hdfshop2010@gmail.com" extracted/AVIA-Android-v6_9bi/app/src/main/assets/index.html
           grep -q "6.9bi-live" extracted/AVIA-Android-v6_9bi/app/build.gradle
 
+      - name: Apply fixed staff display order
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('extracted/AVIA-Android-v6_9bi/app/src/main/assets/index.html')
+          s=p.read_text(encoding='utf-8')
+          marker="function toggleStaffUnit(id){const el=g(id);if(el)el.classList.toggle('collapsed')}"
+          helper="""const AVIA_STAFF_DISPLAY_ORDER=[
+          'KHAIRANI FAIDZAH BINTI DOLAH',
+          'NUR BALKIS BINTI YAACOB',
+          'AIN SYAHEERA BINTI ABD RAHMAN',
+          'MOHD KHAIRI BIN ZAKARIA',
+          'MOHAMAD TAZLY BIN YAHYA',
+          'IZZUWAN HAKIM BIN KAMARUZZAMAN'
+          ];
+          const AVIA_STAFF_DISPLAY_RANK=new Map(AVIA_STAFF_DISPLAY_ORDER.map((n,i)=>[n,i]));
+          function sortAviaStaff(list){return [...list].sort((a,b)=>{const an=String(a?.full_name||a?.email||'').trim().toUpperCase(),bn=String(b?.full_name||b?.email||'').trim().toUpperCase(),ar=AVIA_STAFF_DISPLAY_RANK.has(an)?AVIA_STAFF_DISPLAY_RANK.get(an):9999,br=AVIA_STAFF_DISPLAY_RANK.has(bn)?AVIA_STAFF_DISPLAY_RANK.get(bn):9999;if(ar!==br)return ar-br;return an.localeCompare(bn,'ms')})}
+          """
+          if 'AVIA_STAFF_DISPLAY_ORDER' not in s:
+              if marker not in s: raise SystemExit('staff render marker not found')
+              s=s.replace(marker,helper+marker,1)
+          old_people="const people=groups[u].sort((a,b)=>(a.full_name||a.email||'').localeCompare((b.full_name||b.email||''),'ms'));"
+          if old_people not in s: raise SystemExit('staff list sort marker not found')
+          s=s.replace(old_people,"const people=sortAviaStaff(groups[u]);")
+          old_today="return scopeStaff().filter(s=>(`${s.full_name||''} ${s.email||''}`).toLowerCase().includes(q));"
+          if old_today not in s: raise SystemExit('today staff sort marker not found')
+          s=s.replace(old_today,"return sortAviaStaff(scopeStaff().filter(s=>(`${s.full_name||''} ${s.email||''}`).toLowerCase().includes(q)));",1)
+          p.write_text(s,encoding='utf-8')
+          PY
+          grep -q "AVIA_STAFF_DISPLAY_ORDER" extracted/AVIA-Android-v6_9bi/app/src/main/assets/index.html
+          grep -q "const people=sortAviaStaff(groups\[u\])" extracted/AVIA-Android-v6_9bi/app/src/main/assets/index.html
+
       - name: Build APK
         run: |
           cd extracted/AVIA-Android-v6_9bi
