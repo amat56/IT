@@ -195,43 +195,20 @@ jobs:
           if old_btn not in s: raise SystemExit('force password button marker not found')
           s=s.replace(old_btn,new_btn,1)
           old_bind="window.addEventListener('focus',()=>{if(TOKEN&&!demo)syncAll()});g('changeOwnPasswordBtn')?.addEventListener('click',changeOwnPassword);"
-          new_bind="window.addEventListener('focus',()=>{if(TOKEN&&!demo)syncAll()});"
           if old_bind not in s: raise SystemExit('force password listener marker not found')
-          s=s.replace(old_bind,new_bind,1)
-          old_start="""async function changeOwnPassword(){
-  const p1=g('newOwnPassword').value,p2=g('confirmOwnPassword').value;
-  if(p1.length<8)return alert('Password baharu minimum 8 aksara.');
-  if(p1!==p2)return alert('Password tidak sepadan.');"""
-          new_start="""async function changeOwnPassword(){
-  const msg=g('forcePasswordMsg'),btn=g('changeOwnPasswordBtn');
-  const fail=t=>{if(msg)msg.textContent=t;else alert(t)};
-  if(msg)msg.textContent='';
-  const p1=g('newOwnPassword').value,p2=g('confirmOwnPassword').value;
-  if(p1.length<8)return fail('Password baharu minimum 8 aksara.');
-  if(p1!==p2)return fail('Password tidak sepadan.');"""
+          s=s.replace(old_bind,"window.addEventListener('focus',()=>{if(TOKEN&&!demo)syncAll()});",1)
+          old_start="async function changeOwnPassword(){\n  const p1=g('newOwnPassword').value,p2=g('confirmOwnPassword').value;\n  if(p1.length<8)return alert('Password baharu minimum 8 aksara.');\n  if(p1!==p2)return alert('Password tidak sepadan.');"
+          new_start="async function changeOwnPassword(){\n  const msg=g('forcePasswordMsg'),btn=g('changeOwnPasswordBtn');\n  const fail=t=>{if(msg)msg.textContent=t;else alert(t)};\n  if(msg)msg.textContent='';\n  const p1=g('newOwnPassword').value,p2=g('confirmOwnPassword').value;\n  if(p1.length<8)return fail('Password baharu minimum 8 aksara.');\n  if(p1!==p2)return fail('Password tidak sepadan.');"
           if old_start not in s: raise SystemExit('changeOwnPassword start marker not found')
           s=s.replace(old_start,new_start,1)
-          old_try="""  try{
-    const r=await fetch(CFG.url.replace(/\\/$/,'')+'/auth/v1/user',{\n"""
-          new_try="""  try{
-    if(btn)btn.disabled=true;
-    if(msg)msg.textContent='Menyimpan password baharu...';
-    const r=await fetch(CFG.url.replace(/\\/$/,'')+'/auth/v1/user',{\n"""
-          if old_try not in s: raise SystemExit('changeOwnPassword fetch marker not found')
-          s=s.replace(old_try,new_try,1)
-          old_success="""    g('newOwnPassword').value='';g('confirmOwnPassword').value='';
-    alert('Password berjaya ditukar.');
-  }catch(e){alert(e.message)}
-}
-function enforcePasswordChange(){"""
-          new_success="""    g('newOwnPassword').value='';g('confirmOwnPassword').value='';
-    if(msg)msg.textContent='Password berjaya ditukar.';
-    alert('Password berjaya ditukar.');
-  }catch(e){fail(e.message||'Gagal tukar password.')}finally{if(btn)btn.disabled=false}
-}
-function enforcePasswordChange(){"""
-          if old_success not in s: raise SystemExit('changeOwnPassword completion marker not found')
-          s=s.replace(old_success,new_success,1)
+          old_fetch="  try{\n    const r=await fetch(CFG.url.replace(/\\/$/,'')+'/auth/v1/user',{"
+          new_fetch="  try{\n    if(btn)btn.disabled=true;\n    if(msg)msg.textContent='Menyimpan password baharu...';\n    const r=await fetch(CFG.url.replace(/\\/$/,'')+'/auth/v1/user',{"
+          if old_fetch not in s: raise SystemExit('changeOwnPassword fetch marker not found')
+          s=s.replace(old_fetch,new_fetch,1)
+          old_done="    g('newOwnPassword').value='';g('confirmOwnPassword').value='';\n    alert('Password berjaya ditukar.');\n  }catch(e){alert(e.message)}\n}\nfunction enforcePasswordChange(){"
+          new_done="    g('newOwnPassword').value='';g('confirmOwnPassword').value='';\n    if(msg)msg.textContent='Password berjaya ditukar.';\n    alert('Password berjaya ditukar.');\n  }catch(e){fail(e.message||'Gagal tukar password.')}finally{if(btn)btn.disabled=false}\n}\nfunction enforcePasswordChange(){"
+          if old_done not in s: raise SystemExit('changeOwnPassword completion marker not found')
+          s=s.replace(old_done,new_done,1)
           p.write_text(s,encoding='utf-8')
           PY
           grep -q 'onclick="changeOwnPassword()"' web/index.html
