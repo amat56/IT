@@ -1,0 +1,71 @@
+name: AVIA Post-build KPI Order
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/avia-postbuild-kpi-order.yml
+  workflow_run:
+    workflows:
+      - Build AVIA Web PWA
+    types:
+      - completed
+
+permissions:
+  contents: write
+
+concurrency:
+  group: avia-postbuild-kpi-order
+  cancel-in-progress: true
+
+jobs:
+  patch-production:
+    if: github.event_name == 'push' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout production branch
+        uses: actions/checkout@v4
+        with:
+          ref: avia-web-dist
+          fetch-depth: 0
+
+      - name: Keep KPI detail order aligned with staff list
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          old = 'const arr=groups[type]||[];'
+          new = 'const arr=sortAviaStaff(groups[type]||[]);'
+          if new not in s:
+              if old not in s:
+                  raise SystemExit('KPI detail order marker not found')
+              s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+          grep -Fq 'const arr=sortAviaStaff(groups[type]||[]);' index.html
+
+      - name: Bump PWA cache after KPI order patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -q "const CACHE='avia-web-v4';" sw.js; then
+            sed -i "s/const CACHE='avia-web-v4';/const CACHE='avia-web-v5';/" sw.js
+          fi
+
+      - name: Publish patched production
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'AVIA Build'
+          git config user.email 'actions@github.com'
+          git add index.html sw.js
+          if git diff --cached --quiet; then
+            echo 'Production already patched.'
+            exit 0
+          fi
+          git commit -m 'Keep AVIA KPI detail order consistent'
+          git push origin HEAD:avia-web-dist
