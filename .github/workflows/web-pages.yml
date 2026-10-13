@@ -33,86 +33,21 @@ jobs:
           cp extracted/AVIA-Android-v6_9bi/app/src/main/assets/index.html web/index.html
           mkdir -p web/icons
           cp extracted/AVIA-Android-v6_9bi/app/src/main/res/drawable-nodpi/avia_launcher.png web/icons/icon-512.png
-
           python3 - <<'PY'
           from pathlib import Path
-          p = Path('web/index.html')
-          s = p.read_text(encoding='utf-8')
-
-          meta = '''
-<link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#0b5ea8">
-<meta name="application-name" content="AVIA">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="AVIA">
-<meta name="format-detection" content="telephone=no">
-<link rel="icon" type="image/png" href="icons/icon-512.png">
-<link rel="apple-touch-icon" href="icons/icon-512.png">
-'''
+          p=Path('web/index.html')
+          s=p.read_text(encoding='utf-8')
+          meta='''\n<link rel="manifest" href="manifest.webmanifest">\n<meta name="theme-color" content="#0b5ea8">\n<meta name="application-name" content="AVIA">\n<meta name="mobile-web-app-capable" content="yes">\n<meta name="apple-mobile-web-app-capable" content="yes">\n<meta name="apple-mobile-web-app-status-bar-style" content="default">\n<meta name="apple-mobile-web-app-title" content="AVIA">\n<meta name="format-detection" content="telephone=no">\n<link rel="icon" type="image/png" href="icons/icon-512.png">\n<link rel="apple-touch-icon" href="icons/icon-512.png">\n'''
           if 'manifest.webmanifest' not in s:
-              s = s.replace('<head>', '<head>' + meta, 1)
-
-          needle = '<button id="loginBtn">Log Masuk</button>'
+              s=s.replace('<head>','<head>'+meta,1)
+          needle='<button id="loginBtn">Log Masuk</button>'
           if 'installPwaBtn' not in s and needle in s:
-              s = s.replace(
-                  needle,
-                  needle + '<button id="installPwaBtn" type="button" class="alt hidden" style="margin-left:8px">Install AVIA</button>',
-                  1,
-              )
-
-          script = '''
-<script>
-(function(){
-  let promptEvent = null;
-  const button = () => document.getElementById('installPwaBtn');
-  const standalone = () =>
-    window.matchMedia?.('(display-mode: standalone)').matches ||
-    window.navigator.standalone === true;
-
-  const hideInstall = () => button()?.classList.add('hidden');
-  const showInstall = () => { if (!standalone()) button()?.classList.remove('hidden'); };
-
-  window.addEventListener('beforeinstallprompt', event => {
-    event.preventDefault();
-    promptEvent = event;
-    showInstall();
-  });
-
-  window.addEventListener('appinstalled', () => {
-    promptEvent = null;
-    hideInstall();
-  });
-
-  document.addEventListener('click', async event => {
-    if (event.target?.id !== 'installPwaBtn') return;
-    if (promptEvent) {
-      promptEvent.prompt();
-      try { await promptEvent.userChoice; } catch (_) {}
-      promptEvent = null;
-      hideInstall();
-      return;
-    }
-    alert('Dalam Chrome atau Edge: buka menu browser dan pilih Install AVIA / Install app.');
-  });
-
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {});
-    });
-  }
-
-  if (standalone()) hideInstall();
-})();
-</script>
-'''
+              s=s.replace(needle,needle+'<button id="installPwaBtn" type="button" class="alt hidden" style="margin-left:8px">Install AVIA</button>',1)
+          script='''\n<script>\n(function(){\nlet promptEvent=null;const b=()=>document.getElementById('installPwaBtn');\nconst standalone=()=>window.matchMedia?.('(display-mode: standalone)').matches||window.navigator.standalone===true;\nwindow.addEventListener('beforeinstallprompt',e=>{e.preventDefault();promptEvent=e;if(!standalone())b()?.classList.remove('hidden');});\nwindow.addEventListener('appinstalled',()=>{promptEvent=null;b()?.classList.add('hidden');});\ndocument.addEventListener('click',async e=>{if(e.target?.id!=='installPwaBtn')return;if(promptEvent){promptEvent.prompt();try{await promptEvent.userChoice}catch(_){}promptEvent=null;b()?.classList.add('hidden');}else alert('Dalam Chrome/Edge: buka menu browser dan pilih Install AVIA / Install app.');});\nif('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js',{scope:'./'}).catch(()=>{}));\nif(standalone())b()?.classList.add('hidden');\n})();\n</script>\n'''
           if "navigator.serviceWorker.register('./sw.js'" not in s:
-              s = s.replace('</body>', script + '</body>', 1)
-
-          p.write_text(s, encoding='utf-8')
+              s=s.replace('</body>',script+'</body>',1)
+          p.write_text(s,encoding='utf-8')
           PY
-
           cat > web/manifest.webmanifest <<'EOF'
           {
             "id": "./",
@@ -120,7 +55,6 @@ jobs:
             "short_name": "AVIA",
             "description": "AVIA UNIT IT — pergerakan staf, status, birthday, pengumuman dan pentadbiran.",
             "lang": "ms-MY",
-            "dir": "ltr",
             "start_url": "./",
             "scope": "./",
             "display": "standalone",
@@ -135,103 +69,32 @@ jobs:
             ]
           }
           EOF
-
           cat > web/sw.js <<'EOF'
-          const CACHE = 'avia-web-v2';
-          const SHELL = ['./', './index.html', './manifest.webmanifest', './offline.html', './icons/icon-512.png'];
-
-          self.addEventListener('install', event => {
-            event.waitUntil(
-              caches.open(CACHE)
-                .then(cache => cache.addAll(SHELL))
-                .then(() => self.skipWaiting())
-            );
-          });
-
-          self.addEventListener('activate', event => {
-            event.waitUntil(
-              caches.keys()
-                .then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key))))
-                .then(() => self.clients.claim())
-            );
-          });
-
-          self.addEventListener('fetch', event => {
-            const request = event.request;
-            const url = new URL(request.url);
-
-            if (request.method !== 'GET') return;
-            if (url.hostname.endsWith('.supabase.co')) return;
-
-            if (request.mode === 'navigate') {
-              event.respondWith(
-                fetch(request)
-                  .then(response => {
-                    if (response && response.ok) {
-                      const copy = response.clone();
-                      caches.open(CACHE).then(cache => cache.put('./index.html', copy));
-                    }
-                    return response;
-                  })
-                  .catch(() => caches.match('./index.html').then(response => response || caches.match('./offline.html')))
-              );
-              return;
-            }
-
-            event.respondWith(
-              caches.match(request).then(cached => {
-                const network = fetch(request)
-                  .then(response => {
-                    if (response && response.ok && url.origin === self.location.origin) {
-                      const copy = response.clone();
-                      caches.open(CACHE).then(cache => cache.put(request, copy));
-                    }
-                    return response;
-                  })
-                  .catch(() => cached);
-                return cached || network;
-              })
-            );
-          });
+          const CACHE='avia-web-v2';
+          const SHELL=['./','./index.html','./manifest.webmanifest','./offline.html','./icons/icon-512.png'];
+          self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting())));
+          self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
+          self.addEventListener('fetch',e=>{const r=e.request,u=new URL(r.url);if(r.method!=='GET'||u.hostname.endsWith('.supabase.co'))return;if(r.mode==='navigate'){e.respondWith(fetch(r).then(x=>{if(x&&x.ok){const c=x.clone();caches.open(CACHE).then(k=>k.put('./index.html',c));}return x;}).catch(()=>caches.match('./index.html').then(x=>x||caches.match('./offline.html'))));return;}e.respondWith(caches.match(r).then(cached=>cached||fetch(r).then(x=>{if(x&&x.ok&&u.origin===self.location.origin){const c=x.clone();caches.open(CACHE).then(k=>k.put(r,c));}return x;})));});
           EOF
-
           cat > web/offline.html <<'EOF'
           <!doctype html><html lang="ms"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b5ea8"><title>AVIA Offline</title><style>body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;margin:0;display:grid;place-items:center;min-height:100vh;background:#f4f7fb;color:#17324d}.box{max-width:520px;margin:20px;padding:28px;background:white;border-radius:18px;box-shadow:0 8px 30px #0001;text-align:center}.muted{opacity:.72}</style><div class="box"><h1>AVIA</h1><p>Tiada sambungan internet.</p><p class="muted">Sambungkan internet dan buka semula AVIA untuk sync data Supabase.</p></div></html>
           EOF
-
           cat > web/vercel.json <<'EOF'
           {
             "headers": [
-              {
-                "source": "/sw.js",
-                "headers": [{"key":"Cache-Control","value":"public, max-age=0, must-revalidate"}]
-              },
-              {
-                "source": "/manifest.webmanifest",
-                "headers": [
-                  {"key":"Content-Type","value":"application/manifest+json; charset=utf-8"},
-                  {"key":"Cache-Control","value":"public, max-age=0, must-revalidate"}
-                ]
-              },
-              {
-                "source": "/(.*)",
-                "headers": [
-                  {"key":"X-Content-Type-Options","value":"nosniff"},
-                  {"key":"Referrer-Policy","value":"strict-origin-when-cross-origin"}
-                ]
-              }
+              {"source":"/sw.js","headers":[{"key":"Cache-Control","value":"public, max-age=0, must-revalidate"}]},
+              {"source":"/manifest.webmanifest","headers":[{"key":"Content-Type","value":"application/manifest+json; charset=utf-8"},{"key":"Cache-Control","value":"public, max-age=0, must-revalidate"}]},
+              {"source":"/(.*)","headers":[{"key":"X-Content-Type-Options","value":"nosniff"},{"key":"Referrer-Policy","value":"strict-origin-when-cross-origin"}]}
             ]
           }
           EOF
-
           printf '{"app":"AVIA","source_branch":"avia-web-pwa","source_commit":"%s","built_at":"%s"}\n' "$GITHUB_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > web/version.json
           touch web/.nojekyll
-
           grep -q 'AVIA_SUPABASE_FIXED' web/index.html
           grep -q 'hdfshop2010@gmail.com' web/index.html
           grep -q 'installPwaBtn' web/index.html
-          grep -q "navigator.serviceWorker.register('./sw.js'" web/index.html
-          grep -q "avia-web-v2" web/sw.js
+          grep -q 'serviceWorker' web/index.html
+          grep -q 'avia-web-v2' web/sw.js
           python3 -m json.tool web/manifest.webmanifest >/dev/null
           python3 -m json.tool web/vercel.json >/dev/null
           test -s web/index.html
