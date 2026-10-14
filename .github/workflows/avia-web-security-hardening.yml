@@ -1,0 +1,132 @@
+name: AVIA Web Security Hardening
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/avia-web-security-hardening.yml'
+  workflow_run:
+    workflows: ['Build AVIA Web PWA']
+    types: [completed]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: avia-web-security-hardening
+  cancel-in-progress: true
+
+jobs:
+  harden:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout production branch
+        uses: actions/checkout@v4
+        with:
+          ref: avia-web-dist
+          fetch-depth: 0
+
+      - name: Harden public AVIA surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+
+          # Do not expose official-looking third-party imagery before authentication.
+          s=re.sub(
+            r'<img id="headerJata"[^>]*>',
+            '<img id="headerJata" class="headerJata" src="icons/icon-512.png" alt="AVIA" referrerpolicy="no-referrer">',
+            s,
+            count=1,
+            flags=re.S,
+          )
+
+          # Public login is deliberately minimal: no bootstrap, demo credentials or install CTA.
+          safe_login='''<section id="loginView" class="card hidden">
+          <h2>AVIA Unit IT</h2>
+          <p class="muted">Aplikasi dalaman untuk staf yang telah diberi akses. Gunakan akaun AVIA anda sahaja.</p>
+          <div class="note" style="margin-bottom:10px"><b>Akses staf sahaja.</b> AVIA tidak meminta kod setup, password sementara umum, atau pemasangan perisian pada skrin ini.</div>
+          <input id="email" class="field" placeholder="Email / ID Login AVIA" type="email" autocomplete="username" style="margin-bottom:8px">
+          <input id="password" class="field" placeholder="Password AVIA" type="password" autocomplete="current-password" style="margin-bottom:8px">
+          <div class="actions"><button id="loginBtn" type="button">Log Masuk</button><button id="forgotPasswordBtn" type="button" class="light">Lupa Password?</button></div>
+          <div id="loginMsg" class="muted" style="margin-top:8px"></div>
+          <div id="loginSecurityMsg" class="muted" style="margin-top:6px"></div>
+          <div id="resetMsg" class="muted" style="margin-top:6px"></div>
+          </section>
+
+          <section id="appView"'''
+          s,n=re.subn(r'<section id="loginView".*?</section>\s*<section id="appView"',safe_login,s,count=1,flags=re.S)
+          if n!=1: raise SystemExit('login section marker not found')
+
+          # Bootstrap was a one-time operation and must not remain exposed publicly.
+          s,n=re.subn(r'\s*<div id="bootstrapAdminSheet".*?</div></div>\s*<script>\s*let AVIA_BOOTSTRAP_ADMIN_EMAIL=.*?</script>', '', s, count=1, flags=re.S)
+          if n!=1: raise SystemExit('bootstrap block marker not found')
+
+          # Remove the old shared temporary password from shipped source.
+          s=s.replace("const AVIA_STAFF_TEMP_PASSWORD='P@ss1234';", "const AVIA_STAFF_TEMP_PASSWORD='';")
+          s=s.replace('Password sementara staf ialah P@ss1234 dan staf wajib menukarnya selepas login pertama.','Password sementara dijana secara rawak oleh server dan staf wajib menukarnya selepas login pertama.')
+          s=s.replace('password:AVIA_STAFF_TEMP_PASSWORD', 'password:undefined')
+          s=s.replace('password:password||undefined,', '')
+          s=s.replace('P@ss1234','')
+
+          # Explicitly identify the page as private/internal and keep it out of search results.
+          if 'name="robots"' not in s:
+            s=s.replace('<meta charset="utf-8">','<meta charset="utf-8">\n<meta name="robots" content="noindex,nofollow,noarchive,nosnippet">\n<meta name="description" content="AVIA Unit IT internal staff availability application. Authorized staff access only.">',1)
+
+          p.write_text(s,encoding='utf-8')
+          PY
+
+          # Fresh service worker cache so previously cached login HTML is replaced.
+          sed -i "s/avia-web-v4/avia-web-v5/g; s/avia-web-v3/avia-web-v5/g" sw.js
+
+          cat > vercel.json <<'EOF'
+          {
+            "headers": [
+              {"source":"/sw.js","headers":[{"key":"Cache-Control","value":"public, max-age=0, must-revalidate"},{"key":"X-Content-Type-Options","value":"nosniff"}]},
+              {"source":"/manifest.webmanifest","headers":[{"key":"Content-Type","value":"application/manifest+json; charset=utf-8"},{"key":"Cache-Control","value":"public, max-age=0, must-revalidate"}]},
+              {"source":"/index.html","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"}]},
+              {"source":"/","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"}]},
+              {"source":"/(.*)","headers":[
+                {"key":"X-Content-Type-Options","value":"nosniff"},
+                {"key":"X-Frame-Options","value":"DENY"},
+                {"key":"Referrer-Policy","value":"no-referrer"},
+                {"key":"Permissions-Policy","value":"camera=(), microphone=(), geolocation=(self)"},
+                {"key":"Content-Security-Policy","value":"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://ayvwookeatxgsuzqmwnv.supabase.co https://solat.my https://www.e-solat.gov.my; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"}
+              ]}
+            ]
+          }
+          EOF
+
+          # Security regression checks.
+          ! grep -q 'P@ss1234' index.html
+          ! grep -q 'Setup Admin Pertama' index.html
+          ! grep -q 'bootstrapAdminBtn' index.html
+          ! grep -q 'hdfshop2010@gmail.com' index.html
+          ! grep -q 'upload.wikimedia.org' index.html
+          ! grep -q 'Login Demo Staf' index.html
+          ! grep -q 'installPwaBtn' index.html
+          grep -q 'Akses staf sahaja' index.html
+          grep -q 'noindex,nofollow' index.html
+          grep -q 'avia-web-v5' sw.js
+          python3 -m json.tool vercel.json >/dev/null
+
+      - name: Publish hardened production
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo 'Already hardened.'
+            exit 0
+          fi
+          git config user.name 'AVIA Security Build'
+          git config user.email 'actions@github.com'
+          git add index.html sw.js vercel.json
+          git commit -m 'Harden AVIA public login surface'
+          git push origin HEAD:avia-web-dist
