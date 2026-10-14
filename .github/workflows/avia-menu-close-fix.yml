@@ -1,6 +1,7 @@
-name: AVIA Menu Close Fix
+name: AVIA Menu Cleanup
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
@@ -17,7 +18,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  fix-menu:
+  clean-menu:
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
@@ -27,7 +28,7 @@ jobs:
           ref: avia-web-dist
           fetch-depth: 0
 
-      - name: Make close menu explicit and touch-safe
+      - name: Remove redundant close menu control
         shell: bash
         run: |
           set -euo pipefail
@@ -38,53 +39,57 @@ jobs:
           p=Path('index.html')
           s=p.read_text(encoding='utf-8')
 
-          # Make the purpose explicit in the UI.
+          # The drawer already closes when a menu item is selected and when the
+          # user taps the dark backdrop, so a separate Close Menu button is redundant.
           s=re.sub(
-              r'<button id="closeMenu" class="drawerItem"(?: type="button")?>[^<]*</button>',
-              '<button id="closeMenu" class="drawerItem" type="button">✕ Tutup Menu</button>',
+              r'<button id="closeMenu" class="drawerItem"(?: type="button")?>.*?</button>',
+              '',
               s,
               count=1,
+              flags=re.S,
           )
 
-          # Add a dedicated touch/pointer-safe close handler. This is intentionally
-          # independent of the older generic drawer handlers used by Android/WebView.
-          fix='''<script id="aviaCloseMenuFix">
-          (function(){
-            const drawer=document.getElementById('drawer');
-            const btn=document.getElementById('closeMenu');
-            if(!drawer||!btn)return;
-            const closeMenuNow=(ev)=>{
-              if(ev){ev.preventDefault();ev.stopPropagation();}
-              drawer.classList.add('hidden');
-            };
-            btn.onclick=closeMenuNow;
-            btn.onpointerup=closeMenuNow;
-            btn.addEventListener('touchend',closeMenuNow,{passive:false});
-          })();
-          </script>'''
-          if 'aviaCloseMenuFix' not in s:
-              s=s.replace('</body>', fix+'\n</body>', 1)
+          # Remove the old direct handler so deleting the button cannot cause a JS error.
+          s=s.replace(";g('closeMenu').onclick=()=>g('drawer').classList.add('hidden');", ";")
+
+          # Remove the older optional drawer-close compatibility block.
+          s=re.sub(
+              r'\n\s*// Drawer close remains explicit\.\s*\n\s*if\(g\(\'closeMenu\'\)\)\{.*?\n\s*\}\s*',
+              '\n',
+              s,
+              count=1,
+              flags=re.S,
+          )
+
+          # Remove the dedicated close-menu patch script added previously.
+          s=re.sub(
+              r'\s*<script id="aviaCloseMenuFix">.*?</script>\s*',
+              '\n',
+              s,
+              count=1,
+              flags=re.S,
+          )
 
           p.write_text(s,encoding='utf-8')
           PY
 
-          # Force browsers/PWA to take the updated menu behavior.
-          sed -i "s/avia-web-v9/avia-web-v10/g; s/avia-web-v8/avia-web-v10/g; s/avia-web-v7/avia-web-v10/g" sw.js
+          # Bust PWA cache so the simplified drawer appears immediately.
+          sed -i "s/avia-web-v10/avia-web-v11/g; s/avia-web-v9/avia-web-v11/g; s/avia-web-v8/avia-web-v11/g; s/avia-web-v7/avia-web-v11/g" sw.js
 
-          grep -q '✕ Tutup Menu' index.html
-          grep -q 'aviaCloseMenuFix' index.html
-          grep -q 'avia-web-v10' sw.js
+          ! grep -q 'id="closeMenu"' index.html
+          ! grep -q 'aviaCloseMenuFix' index.html
+          grep -q 'avia-web-v11' sw.js
 
-      - name: Publish menu fix
+      - name: Publish menu cleanup
         shell: bash
         run: |
           set -euo pipefail
           if git diff --quiet; then
-            echo 'Menu close fix already applied.'
+            echo 'Menu already clean.'
             exit 0
           fi
           git config user.name 'AVIA UI Build'
           git config user.email 'actions@github.com'
           git add index.html sw.js
-          git commit -m 'Fix AVIA Tutup Menu action'
+          git commit -m 'Remove redundant Tutup Menu button'
           git push origin HEAD:avia-web-dist
