@@ -75,9 +75,9 @@ jobs:
           s,n=re.subn(r'<section id="loginView".*?</section>\s*<section id="appView"',safe_login,s,count=1,flags=re.S)
           if n!=1: raise SystemExit('login section marker not found')
 
-          # Bootstrap was a one-time operation and must not remain exposed publicly.
-          s,n=re.subn(r'\s*<div id="bootstrapAdminSheet".*?</div></div>\s*<script>\s*let AVIA_BOOTSTRAP_ADMIN_EMAIL=.*?</script>', '', s, count=1, flags=re.S)
-          if n!=1: raise SystemExit('bootstrap block marker not found')
+          # Bootstrap was a one-time operation. Remove it if an upstream build ever
+          # reintroduces it; on already-hardened builds, zero matches is expected.
+          s=re.sub(r'\s*<div id="bootstrapAdminSheet".*?</div></div>\s*<script>\s*let AVIA_BOOTSTRAP_ADMIN_EMAIL=.*?</script>', '', s, count=1, flags=re.S)
 
           # Remove the old shared temporary password from shipped source.
           s=s.replace("const AVIA_STAFF_TEMP_PASSWORD='P@ss1234';", "const AVIA_STAFF_TEMP_PASSWORD='';")
@@ -109,7 +109,7 @@ jobs:
           PY
 
           # Fresh service worker cache so previously cached login/header HTML is replaced.
-          sed -i "s/avia-web-v5/avia-web-v6/g; s/avia-web-v4/avia-web-v6/g; s/avia-web-v3/avia-web-v6/g" sw.js
+          sed -i "s/avia-web-v6/avia-web-v7/g; s/avia-web-v5/avia-web-v7/g; s/avia-web-v4/avia-web-v7/g; s/avia-web-v3/avia-web-v7/g" sw.js
 
           cat > vercel.json <<'EOF'
           {
@@ -141,7 +141,7 @@ jobs:
           grep -q 'noindex,nofollow' index.html
           grep -q 'assets/jata-negara.jpg' index.html
           grep -q 'aviaLocalJataGuard' index.html
-          grep -q 'avia-web-v6' sw.js
+          grep -q 'avia-web-v7' sw.js
           test -s assets/jata-negara.jpg
           python3 -m json.tool vercel.json >/dev/null
 
