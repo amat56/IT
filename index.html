@@ -831,7 +831,7 @@ header .headerLeftBrand{
 </div>
 
 <div id="drawer" class="drawer hidden"><div class="drawerPanel"><h3>Menu</h3><div id="drawerIdentity" class="note" style="margin-bottom:12px"><b>Pengguna</b><br><span class="muted">Role</span></div>
-<button class="drawerItem" data-view="today">🏠 Hari Ini</button><button class="drawerItem" data-view="calendar">📅 Kalendar</button><button class="drawerItem" data-view="update">➕ Update</button><button class="drawerItem" data-view="staffView">👥 Staf</button><button class="drawerItem" data-view="inbox">🔔 Inbox <span id="inboxBadge" class="inbox-badge zero">0</span></button><button class="drawerItem" data-view="report">📊 Laporan</button><button id="adminMenu" class="drawerItem hidden" data-view="admin">🛠️ Admin</button><button class="drawerItem" data-view="profile">👤 Profil</button><button id="closeMenu" class="drawerItem" type="button">✕ Tutup Menu</button>
+<button class="drawerItem" data-view="today">🏠 Hari Ini</button><button class="drawerItem" data-view="calendar">📅 Kalendar</button><button class="drawerItem" data-view="update">➕ Update</button><button class="drawerItem" data-view="staffView">👥 Staf</button><button class="drawerItem" data-view="inbox">🔔 Inbox <span id="inboxBadge" class="inbox-badge zero">0</span></button><button class="drawerItem" data-view="report">📊 Laporan</button><button id="adminMenu" class="drawerItem hidden" data-view="admin">🛠️ Admin</button><button class="drawerItem" data-view="profile">👤 Profil</button>
 </div></div>
 
 <div id="staffSheet" class="sheet hidden"><div><h3>Edit Staf</h3><input type="hidden" id="editStaffId"><div class="formgrid"><input id="sfName" class="field" placeholder="Nama penuh"><input id="sfEmail" class="field hidden" placeholder="ID Akaun" disabled><select id="sfUnit" class="field"></select><select id="sfRole" class="field"><option value="staff">Staff</option><option value="lead">Ketua</option></select><label>Tarikh Lahir<input id="sfBirthDate" type="date" class="field"></label><label style="display:flex;align-items:center;gap:10px;padding:8px 2px"><input id="sfShowBirthday" type="checkbox" checked style="width:20px;height:20px"> Paparkan Hari Lahir di Dashboard</label></div><div class="actions" style="margin-top:12px"><button id="saveStaffBtn">Simpan</button><button id="cancelStaffBtn" class="alt">Batal</button></div></div></div>
@@ -1361,7 +1361,7 @@ function init(){
 }
 g('saveCfg').onclick=()=>{const url=g('cfgUrl').value.trim(),key=g('cfgKey').value.trim();if(!url||!key)return alert('URL dan key diperlukan');CFG={url,key};localStorage.setItem('myunit_v6_cfg',JSON.stringify(CFG));g('setupView').classList.add('hidden');g('loginView').classList.remove('hidden')};g('demoMode').onclick=async()=>{await bootDemo();refreshDrawerRole();show('today');};
 g('loginBtn').onclick=async()=>{try{g('loginMsg').textContent='Login...';await loginRemote();g('loginView').classList.add('hidden');g('appView').classList.remove('hidden');await syncAll();enforcePasswordChange();renderBiometricSettings();syncTimer=setInterval(syncAll,20000)}catch(e){g('loginMsg').textContent=e.message}};
-g('openMenu').onclick=()=>{refreshDrawerRole();g('drawer').classList.remove('hidden');};g('closeMenu').onclick=()=>g('drawer').classList.add('hidden');g('drawer').onclick=e=>{if(e.target===g('drawer'))g('drawer').classList.add('hidden')};document.querySelectorAll('.drawerItem[data-view]').forEach(b=>b.onclick=()=>show(b.dataset.view));
+g('openMenu').onclick=()=>{refreshDrawerRole();g('drawer').classList.remove('hidden');};g('drawer').onclick=e=>{if(e.target===g('drawer'))g('drawer').classList.add('hidden')};document.querySelectorAll('.drawerItem[data-view]').forEach(b=>b.onclick=()=>show(b.dataset.view));
 g('prev').onclick=()=>{cm=new Date(cm.getFullYear(),cm.getMonth()-1,1);renderCal()};g('next').onclick=()=>{cm=new Date(cm.getFullYear(),cm.getMonth()+1,1);renderCal()};g('save').onclick=saveStatus;g('staffSearch').oninput=renderStaff;g('adminSearch').oninput=renderAdmin;g('saveStaffBtn').onclick=saveStaff;g('cancelStaffBtn').onclick=()=>g('staffSheet').classList.add('hidden');g('addUnitBtn').onclick=addUnit;g('forceSync').onclick=syncAll;g('reconfig').onclick=()=>alert('Supabase AVIA telah ditetapkan automatik ke project Khikazo. Tiada konfigurasi manual diperlukan.');g('logout').onclick=()=>{TOKEN='';REFRESH='';ME=null;localStorage.removeItem('myunit_v6_token');localStorage.removeItem('myunit_v6_refresh');localStorage.removeItem('myunit_v6_cache');S=[];U=[];R=[];A=[];if(syncTimer)clearInterval(syncTimer);g('appView').classList.add('hidden');g('loginView').classList.remove('hidden')};document.querySelectorAll('.adminTab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.adminTab').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.querySelectorAll('.adminPane').forEach(x=>x.classList.add('hidden'));g(b.dataset.tab).classList.remove('hidden')});
 window.addEventListener('focus',()=>{if(TOKEN&&!demo)syncAll()});
 g('closeCredentialBtn')?.addEventListener('click',()=>g('credentialSheet').classList.add('hidden'));
@@ -2484,13 +2484,7 @@ window.addEventListener('popstate',()=>{
   btn.onpointerup=openDrawerNow;
   btn.addEventListener('click',openDrawerNow,true);
   btn.addEventListener('touchend',openDrawerNow,{passive:false,capture:true});
-
-  // Drawer close remains explicit.
-  if(g('closeMenu')){
-    g('closeMenu').onclick=(ev)=>{
-      ev?.preventDefault();
-      drawer.classList.add('hidden');
-    };
+;
   }
 
   // Dark backdrop closes drawer only when tapping outside panel.
@@ -3017,20 +3011,6 @@ if(standalone())b()?.classList.add('hidden');
   const sync=()=>jata.classList.toggle('hidden',app.classList.contains('hidden'));
   new MutationObserver(sync).observe(app,{attributes:true,attributeFilter:['class']});
   sync();
-})();
-</script>
-<script id="aviaCloseMenuFix">
-(function(){
-  const drawer=document.getElementById('drawer');
-  const btn=document.getElementById('closeMenu');
-  if(!drawer||!btn)return;
-  const closeMenuNow=(ev)=>{
-    if(ev){ev.preventDefault();ev.stopPropagation();}
-    drawer.classList.add('hidden');
-  };
-  btn.onclick=closeMenuNow;
-  btn.onpointerup=closeMenuNow;
-  btn.addEventListener('touchend',closeMenuNow,{passive:false});
 })();
 </script>
 </body></html>
