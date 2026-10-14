@@ -35,41 +35,35 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import re
-
           p=Path('index.html')
           s=p.read_text(encoding='utf-8')
-
           pattern=r'''function setSync\(ok,text\)\{\n  const dot = `<span class="statusdot \$\{ok\?'ok':'bad'\}"></span>`;\n  if\(g\('syncText'\)\) g\('syncText'\)\.innerHTML=dot\+text;\n  else if\(g\('syncState'\)\) g\('syncState'\)\.innerHTML=dot\+text;\n  if\(ok\)\{\n    localStorage\.setItem\('avia_last_sync',new Date\(\)\.toISOString\(\)\);\n    showError\(''\);\n  \} else if\(!demo\)\{\n    showError\('Data tidak dapat disegerakkan\. Paparan mungkin menggunakan data terakhir yang tersedia\.'\);\n  \}\n  renderLastSync\(\);\n\}'''
-
-          replacement='''function setSync(ok,text){
-  const statusText=String(text||'');
-  const isSyncError=!ok && /offline|gagal|error|failed|network/i.test(statusText);
-  const dotClass=ok?'ok':(isSyncError?'bad':'');
-  const dot = `<span class="statusdot ${dotClass}"></span>`;
-  if(g('syncText')) g('syncText').innerHTML=dot+statusText;
-  else if(g('syncState')) g('syncState').innerHTML=dot+statusText;
-  if(ok){
-    localStorage.setItem('avia_last_sync',new Date().toISOString());
-    showError('');
-  } else if(!demo && isSyncError){
-    showError('Data tidak dapat disegerakkan. Paparan mungkin menggunakan data terakhir yang tersedia.');
-  }
-  renderLastSync();
-}'''
-
+          replacement='\n'.join([
+              'function setSync(ok,text){',
+              "  const statusText=String(text||'');",
+              "  const isSyncError=!ok && /offline|gagal|error|failed|network/i.test(statusText);",
+              "  const dotClass=ok?'ok':(isSyncError?'bad':'');",
+              '  const dot = `<span class="statusdot ${dotClass}"></span>`;',
+              "  if(g('syncText')) g('syncText').innerHTML=dot+statusText;",
+              "  else if(g('syncState')) g('syncState').innerHTML=dot+statusText;",
+              '  if(ok){',
+              "    localStorage.setItem('avia_last_sync',new Date().toISOString());",
+              "    showError('');",
+              '  } else if(!demo && isSyncError){',
+              "    showError('Data tidak dapat disegerakkan. Paparan mungkin menggunakan data terakhir yang tersedia.');",
+              '  }',
+              '  renderLastSync();',
+              '}'
+          ])
           s2,n=re.subn(pattern,replacement,s,count=1)
           if n==0:
-              # Already fixed is acceptable.
               if 'const isSyncError=!ok && /offline|gagal|error|failed|network/i.test(statusText);' not in s:
                   raise SystemExit('Target setSync function not found')
               s2=s
-
           p.write_text(s2,encoding='utf-8')
           PY
 
-          # Bust PWA cache so the fixed login/sync UI is loaded immediately.
           sed -i "s/avia-web-v9/avia-web-v10/g; s/avia-web-v8/avia-web-v10/g; s/avia-web-v7/avia-web-v10/g; s/avia-web-v6/avia-web-v10/g; s/avia-web-v5/avia-web-v10/g; s/avia-web-v4/avia-web-v10/g; s/avia-web-v3/avia-web-v10/g" sw.js
-
           grep -q "const isSyncError=!ok && /offline|gagal|error|failed|network/i.test(statusText);" index.html
           grep -q 'avia-web-v10' sw.js
 
