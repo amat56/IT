@@ -1,0 +1,28 @@
+name: Inspect AVIA Jata Assets
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/inspect-jata-assets.yml'
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect old AVIA header Jata package
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import zipfile, re
+          z='AVIA-Android-v6_9bg-HeaderJata-Project.zip'
+          with zipfile.ZipFile(z) as f:
+              names=f.namelist()
+          print('--- likely jata/logo assets ---')
+          for n in names:
+              low=n.lower()
+              if any(k in low for k in ('jata','logo','header')) or low.endswith(('.png','.jpg','.jpeg','.webp','.svg')):
+                  print(n)
+          PY
