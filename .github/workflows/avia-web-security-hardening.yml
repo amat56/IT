@@ -33,13 +33,30 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Keep Jata Negara as a local AVIA asset. It is fetched only at build time
-          # from the official Government of Malaysia portal, never by staff browsers.
+          # Keep Jata Negara as a local AVIA asset. Fetch the official source only at
+          # build time, then remove the connected white outer background and publish
+          # a transparent PNG. Staff browsers never contact the source site.
           mkdir -p assets
           curl --fail --location --retry 3 --connect-timeout 15 \
             'https://sentang.malaysia.gov.my/api/media/file/Jata-Negara.jpg' \
-            --output assets/jata-negara.jpg
-          test -s assets/jata-negara.jpg
+            --output /tmp/jata-negara-source.jpg
+          test -s /tmp/jata-negara-source.jpg
+
+          if command -v magick >/dev/null 2>&1; then
+            magick /tmp/jata-negara-source.jpg \
+              -alpha on -fuzz 10% -fill none -draw 'color 0,0 floodfill' \
+              -trim +repage assets/jata-negara.png
+          else
+            if ! command -v convert >/dev/null 2>&1; then
+              sudo apt-get update -qq
+              sudo apt-get install -y -qq imagemagick
+            fi
+            convert /tmp/jata-negara-source.jpg \
+              -alpha on -fuzz 10% -fill none -draw 'matte 0,0 floodfill' \
+              -trim +repage assets/jata-negara.png
+          fi
+          test -s assets/jata-negara.png
+          rm -f assets/jata-negara.jpg
 
           python3 - <<'PY'
           from pathlib import Path
@@ -48,11 +65,11 @@ jobs:
           p=Path('index.html')
           s=p.read_text(encoding='utf-8')
 
-          # Use the locally bundled Jata. It stays hidden on the public login screen
-          # and appears in the same header position only after AVIA is authenticated.
+          # Use the transparent locally bundled Jata. It stays hidden on the public
+          # login screen and appears in the same header position after authentication.
           s=re.sub(
             r'<img id="headerJata"[^>]*>',
-            '<img id="headerJata" class="headerJata hidden" src="assets/jata-negara.jpg" alt="Jata Negara Malaysia">',
+            '<img id="headerJata" class="headerJata hidden" src="assets/jata-negara.png" alt="Jata Negara Malaysia">',
             s,
             count=1,
             flags=re.S,
@@ -108,8 +125,8 @@ jobs:
           p.write_text(s,encoding='utf-8')
           PY
 
-          # Fresh service worker cache so previously cached login/header HTML is replaced.
-          sed -i "s/avia-web-v6/avia-web-v7/g; s/avia-web-v5/avia-web-v7/g; s/avia-web-v4/avia-web-v7/g; s/avia-web-v3/avia-web-v7/g" sw.js
+          # Fresh service worker cache so previously cached Jata/header HTML is replaced.
+          sed -i "s/avia-web-v7/avia-web-v8/g; s/avia-web-v6/avia-web-v8/g; s/avia-web-v5/avia-web-v8/g; s/avia-web-v4/avia-web-v8/g; s/avia-web-v3/avia-web-v8/g" sw.js
 
           cat > vercel.json <<'EOF'
           {
@@ -129,7 +146,7 @@ jobs:
           }
           EOF
 
-          # Security regression checks.
+          # Security and visual regression checks.
           ! grep -q 'P@ss1234' index.html
           ! grep -q 'Setup Admin Pertama' index.html
           ! grep -q 'bootstrapAdminBtn' index.html
@@ -139,10 +156,11 @@ jobs:
           ! grep -q 'installPwaBtn' index.html
           grep -q 'Akses staf sahaja' index.html
           grep -q 'noindex,nofollow' index.html
-          grep -q 'assets/jata-negara.jpg' index.html
+          grep -q 'assets/jata-negara.png' index.html
           grep -q 'aviaLocalJataGuard' index.html
-          grep -q 'avia-web-v7' sw.js
-          test -s assets/jata-negara.jpg
+          grep -q 'avia-web-v8' sw.js
+          test -s assets/jata-negara.png
+          test ! -e assets/jata-negara.jpg
           python3 -m json.tool vercel.json >/dev/null
 
       - name: Publish hardened production
@@ -155,6 +173,7 @@ jobs:
           fi
           git config user.name 'AVIA Security Build'
           git config user.email 'actions@github.com'
-          git add index.html sw.js vercel.json assets/jata-negara.jpg
-          git commit -m 'Restore local Jata Negara safely'
+          git add index.html sw.js vercel.json
+          git add -A assets
+          git commit -m 'Use transparent local Jata Negara'
           git push origin HEAD:avia-web-dist
