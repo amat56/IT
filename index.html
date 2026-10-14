@@ -964,13 +964,16 @@ function renderLastSync(){
     : 'Belum ada sync berjaya.';
 }
 function setSync(ok,text){
-  const dot = `<span class="statusdot ${ok?'ok':'bad'}"></span>`;
-  if(g('syncText')) g('syncText').innerHTML=dot+text;
-  else if(g('syncState')) g('syncState').innerHTML=dot+text;
+  const statusText=String(text||'');
+  const isSyncError=!ok && /offline|gagal|error|failed|network/i.test(statusText);
+  const dotClass=ok?'ok':(isSyncError?'bad':'');
+  const dot = `<span class="statusdot ${dotClass}"></span>`;
+  if(g('syncText')) g('syncText').innerHTML=dot+statusText;
+  else if(g('syncState')) g('syncState').innerHTML=dot+statusText;
   if(ok){
     localStorage.setItem('avia_last_sync',new Date().toISOString());
     showError('');
-  } else if(!demo){
+  } else if(!demo && isSyncError){
     showError('Data tidak dapat disegerakkan. Paparan mungkin menggunakan data terakhir yang tersedia.');
   }
   renderLastSync();
