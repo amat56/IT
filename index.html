@@ -409,7 +409,7 @@ header .headerLeftBrand{
 <header id="aviaHeader">
   <button id="openMenu" class="menuBtn">☰</button>
   <div id="jataBrandBlock" class="aviaBrandBlock">
-    <img id="headerJata" class="headerJata" src="icons/icon-512.png" alt="AVIA" referrerpolicy="no-referrer">
+    <img id="headerJata" class="headerJata hidden" src="assets/jata-negara.jpg" alt="Jata Negara Malaysia">
     <div id="brandOrganization" class="headerOrgLeft">UNIT IT</div>
   </div>
   <div id="aviaBrandBlock" class="aviaBrandBlock">
@@ -3004,6 +3004,16 @@ window.addEventListener('appinstalled',()=>{promptEvent=null;b()?.classList.add(
 document.addEventListener('click',async e=>{if(e.target?.id!=='installPwaBtn')return;if(promptEvent){promptEvent.prompt();try{await promptEvent.userChoice}catch(_){}promptEvent=null;b()?.classList.add('hidden');}else alert('Dalam Chrome/Edge: buka menu browser dan pilih Install AVIA / Install app.');});
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js',{scope:'./'}).catch(()=>{}));
 if(standalone())b()?.classList.add('hidden');
+})();
+</script>
+<script id="aviaLocalJataGuard">
+(function(){
+  const app=document.getElementById('appView');
+  const jata=document.getElementById('headerJata');
+  if(!app||!jata)return;
+  const sync=()=>jata.classList.toggle('hidden',app.classList.contains('hidden'));
+  new MutationObserver(sync).observe(app,{attributes:true,attributeFilter:['class']});
+  sync();
 })();
 </script>
 </body></html>
