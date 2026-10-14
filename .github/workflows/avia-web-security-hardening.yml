@@ -32,6 +32,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          # Keep Jata Negara as a local AVIA asset. It is fetched only at build time
+          # from the official Government of Malaysia portal, never by staff browsers.
+          mkdir -p assets
+          curl --fail --location --retry 3 --connect-timeout 15 \
+            'https://sentang.malaysia.gov.my/api/media/file/Jata-Negara.jpg' \
+            --output assets/jata-negara.jpg
+          test -s assets/jata-negara.jpg
+
           python3 - <<'PY'
           from pathlib import Path
           import re
@@ -39,10 +48,11 @@ jobs:
           p=Path('index.html')
           s=p.read_text(encoding='utf-8')
 
-          # Do not expose official-looking third-party imagery before authentication.
+          # Use the locally bundled Jata. It stays hidden on the public login screen
+          # and appears in the same header position only after AVIA is authenticated.
           s=re.sub(
             r'<img id="headerJata"[^>]*>',
-            '<img id="headerJata" class="headerJata" src="icons/icon-512.png" alt="AVIA" referrerpolicy="no-referrer">',
+            '<img id="headerJata" class="headerJata hidden" src="assets/jata-negara.jpg" alt="Jata Negara Malaysia">',
             s,
             count=1,
             flags=re.S,
@@ -80,11 +90,26 @@ jobs:
           if 'name="robots"' not in s:
             s=s.replace('<meta charset="utf-8">','<meta charset="utf-8">\n<meta name="robots" content="noindex,nofollow,noarchive,nosnippet">\n<meta name="description" content="AVIA Unit IT internal staff availability application. Authorized staff access only.">',1)
 
+          # Show Jata only when the authenticated app view is visible. This keeps the
+          # public credential page neutral while preserving the requested header design.
+          jata_script='''<script id="aviaLocalJataGuard">
+          (function(){
+            const app=document.getElementById('appView');
+            const jata=document.getElementById('headerJata');
+            if(!app||!jata)return;
+            const sync=()=>jata.classList.toggle('hidden',app.classList.contains('hidden'));
+            new MutationObserver(sync).observe(app,{attributes:true,attributeFilter:['class']});
+            sync();
+          })();
+          </script>'''
+          if 'aviaLocalJataGuard' not in s:
+            s=s.replace('</body>',jata_script+'\n</body>',1)
+
           p.write_text(s,encoding='utf-8')
           PY
 
-          # Fresh service worker cache so previously cached login HTML is replaced.
-          sed -i "s/avia-web-v4/avia-web-v5/g; s/avia-web-v3/avia-web-v5/g" sw.js
+          # Fresh service worker cache so previously cached login/header HTML is replaced.
+          sed -i "s/avia-web-v5/avia-web-v6/g; s/avia-web-v4/avia-web-v6/g; s/avia-web-v3/avia-web-v6/g" sw.js
 
           cat > vercel.json <<'EOF'
           {
@@ -114,7 +139,10 @@ jobs:
           ! grep -q 'installPwaBtn' index.html
           grep -q 'Akses staf sahaja' index.html
           grep -q 'noindex,nofollow' index.html
-          grep -q 'avia-web-v5' sw.js
+          grep -q 'assets/jata-negara.jpg' index.html
+          grep -q 'aviaLocalJataGuard' index.html
+          grep -q 'avia-web-v6' sw.js
+          test -s assets/jata-negara.jpg
           python3 -m json.tool vercel.json >/dev/null
 
       - name: Publish hardened production
@@ -127,6 +155,6 @@ jobs:
           fi
           git config user.name 'AVIA Security Build'
           git config user.email 'actions@github.com'
-          git add index.html sw.js vercel.json
-          git commit -m 'Harden AVIA public login surface'
+          git add index.html sw.js vercel.json assets/jata-negara.jpg
+          git commit -m 'Restore local Jata Negara safely'
           git push origin HEAD:avia-web-dist
