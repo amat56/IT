@@ -11,18 +11,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Inspect old AVIA header Jata package
+      - name: Inspect old AVIA header Jata source
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           import zipfile, re
           z='AVIA-Android-v6_9bg-HeaderJata-Project.zip'
+          member='AVIA-Android-v6_9bg/app/src/main/assets/index.html'
           with zipfile.ZipFile(z) as f:
-              names=f.namelist()
-          print('--- likely jata/logo assets ---')
-          for n in names:
-              low=n.lower()
-              if any(k in low for k in ('jata','logo','header')) or low.endswith(('.png','.jpg','.jpeg','.webp','.svg')):
-                  print(n)
+              s=f.read(member).decode('utf-8','replace')
+          print('--- headerJata snippets ---')
+          for m in re.finditer(r'.{0,250}(?:headerJata|jata|wikimedia).{0,500}', s, flags=re.I|re.S):
+              print(m.group(0).replace('\n',' ')[:900])
+          print('--- image URLs ---')
+          for u in sorted(set(re.findall(r'https?://[^\"\'<> ]+', s))):
+              if any(k in u.lower() for k in ('jata','wikimedia','wikipedia','malaysia')):
+                  print(u)
           PY
