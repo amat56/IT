@@ -1,0 +1,90 @@
+name: AVIA Menu Close Fix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/avia-menu-close-fix.yml'
+  workflow_run:
+    workflows: ['AVIA Web Security Hardening']
+    types: [completed]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: avia-menu-close-fix
+  cancel-in-progress: true
+
+jobs:
+  fix-menu:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout production branch
+        uses: actions/checkout@v4
+        with:
+          ref: avia-web-dist
+          fetch-depth: 0
+
+      - name: Make close menu explicit and touch-safe
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+
+          # Make the purpose explicit in the UI.
+          s=re.sub(
+              r'<button id="closeMenu" class="drawerItem"(?: type="button")?>[^<]*</button>',
+              '<button id="closeMenu" class="drawerItem" type="button">✕ Tutup Menu</button>',
+              s,
+              count=1,
+          )
+
+          # Add a dedicated touch/pointer-safe close handler. This is intentionally
+          # independent of the older generic drawer handlers used by Android/WebView.
+          fix='''<script id="aviaCloseMenuFix">
+          (function(){
+            const drawer=document.getElementById('drawer');
+            const btn=document.getElementById('closeMenu');
+            if(!drawer||!btn)return;
+            const closeMenuNow=(ev)=>{
+              if(ev){ev.preventDefault();ev.stopPropagation();}
+              drawer.classList.add('hidden');
+            };
+            btn.onclick=closeMenuNow;
+            btn.onpointerup=closeMenuNow;
+            btn.addEventListener('touchend',closeMenuNow,{passive:false});
+          })();
+          </script>'''
+          if 'aviaCloseMenuFix' not in s:
+              s=s.replace('</body>', fix+'\n</body>', 1)
+
+          p.write_text(s,encoding='utf-8')
+          PY
+
+          # Force browsers/PWA to take the updated menu behavior.
+          sed -i "s/avia-web-v9/avia-web-v10/g; s/avia-web-v8/avia-web-v10/g; s/avia-web-v7/avia-web-v10/g" sw.js
+
+          grep -q '✕ Tutup Menu' index.html
+          grep -q 'aviaCloseMenuFix' index.html
+          grep -q 'avia-web-v10' sw.js
+
+      - name: Publish menu fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo 'Menu close fix already applied.'
+            exit 0
+          fi
+          git config user.name 'AVIA UI Build'
+          git config user.email 'actions@github.com'
+          git add index.html sw.js
+          git commit -m 'Fix AVIA Tutup Menu action'
+          git push origin HEAD:avia-web-dist
