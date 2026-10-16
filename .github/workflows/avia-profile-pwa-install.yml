@@ -38,13 +38,14 @@ jobs:
           p=Path('index.html')
           s=p.read_text(encoding='utf-8')
 
-          card='''<div id="profileInstallPwaCard" class="card">
-  <h3 style="margin-top:0">📲 Pasang AVIA</h3>
-  <div class="note">Pasang AVIA pada skrin utama telefon untuk akses lebih cepat. Pilihan ini hanya tersedia selepas anda log masuk.</div>
-  <button id="profileInstallPwaBtn" type="button" style="width:100%;margin-top:10px">Pasang AVIA</button>
-  <div id="profileInstallPwaMsg" class="muted" style="margin-top:8px"></div>
-</div>
-'''
+          card = (
+              '<div id="profileInstallPwaCard" class="card">\n'
+              '  <h3 style="margin-top:0">📲 Pasang AVIA</h3>\n'
+              '  <div class="note">Pasang AVIA pada skrin utama telefon untuk akses lebih cepat. Pilihan ini hanya tersedia selepas anda log masuk.</div>\n'
+              '  <button id="profileInstallPwaBtn" type="button" style="width:100%;margin-top:10px">Pasang AVIA</button>\n'
+              '  <div id="profileInstallPwaMsg" class="muted" style="margin-top:8px"></div>\n'
+              '</div>\n'
+          )
 
           if 'id="profileInstallPwaCard"' not in s:
               marker='<div id="biometricCard" class="card" style="margin-top:12px">'
@@ -52,52 +53,54 @@ jobs:
                   raise SystemExit('Profile biometric marker not found')
               s=s.replace(marker,card+'\n'+marker,1)
 
-          script='''<script id="aviaAuthenticatedPwaInstall">
-(function(){
-  let deferredPrompt=null;
-  const btn=()=>document.getElementById('profileInstallPwaBtn');
-  const msg=()=>document.getElementById('profileInstallPwaMsg');
-  const standalone=()=>window.matchMedia?.('(display-mode: standalone)').matches||window.navigator.standalone===true;
-  const sync=()=>{
-    const b=btn(),m=msg();
-    if(!b)return;
-    if(standalone()){
-      b.classList.add('hidden');
-      if(m)m.textContent='✓ AVIA sudah dipasang pada peranti ini.';
-    }else{
-      b.classList.remove('hidden');
-      if(m&&!m.textContent)m.textContent='Jika prompt tidak keluar, buka menu Chrome dan pilih “Install app” / “Add to Home screen”.';
-    }
-  };
-  window.addEventListener('beforeinstallprompt',e=>{
-    e.preventDefault();
-    deferredPrompt=e;
-    sync();
-  });
-  window.addEventListener('appinstalled',()=>{
-    deferredPrompt=null;
-    sync();
-  });
-  document.addEventListener('click',async e=>{
-    if(e.target?.id!=='profileInstallPwaBtn')return;
-    const m=msg();
-    if(standalone()){sync();return;}
-    if(deferredPrompt){
-      deferredPrompt.prompt();
-      try{
-        const choice=await deferredPrompt.userChoice;
-        if(m)m.textContent=choice?.outcome==='accepted'?'Pemasangan AVIA diterima.':'Pemasangan dibatalkan.';
-      }catch(_){
-        if(m)m.textContent='Gunakan menu Chrome → Install app / Add to Home screen.';
-      }
-      deferredPrompt=null;
-    }else if(m){
-      m.textContent='Buka menu Chrome (⋮) → Install app / Add to Home screen.';
-    }
-  });
-  sync();
-})();
-</script>'''
+          script = (
+              '<script id="aviaAuthenticatedPwaInstall">\n'
+              '(function(){\n'
+              '  let deferredPrompt=null;\n'
+              "  const btn=()=>document.getElementById('profileInstallPwaBtn');\n"
+              "  const msg=()=>document.getElementById('profileInstallPwaMsg');\n"
+              "  const standalone=()=>window.matchMedia?.('(display-mode: standalone)').matches||window.navigator.standalone===true;\n"
+              '  const sync=()=>{\n'
+              '    const b=btn(),m=msg();\n'
+              '    if(!b)return;\n'
+              '    if(standalone()){\n'
+              "      b.classList.add('hidden');\n"
+              "      if(m)m.textContent='✓ AVIA sudah dipasang pada peranti ini.';\n"
+              '    }else{\n'
+              "      b.classList.remove('hidden');\n"
+              "      if(m&&!m.textContent)m.textContent='Jika prompt tidak keluar, buka menu Chrome dan pilih Install app / Add to Home screen.';\n"
+              '    }\n'
+              '  };\n'
+              "  window.addEventListener('beforeinstallprompt',e=>{\n"
+              '    e.preventDefault();\n'
+              '    deferredPrompt=e;\n'
+              '    sync();\n'
+              '  });\n'
+              "  window.addEventListener('appinstalled',()=>{\n"
+              '    deferredPrompt=null;\n'
+              '    sync();\n'
+              '  });\n'
+              "  document.addEventListener('click',async e=>{\n"
+              "    if(e.target?.id!=='profileInstallPwaBtn')return;\n"
+              '    const m=msg();\n'
+              '    if(standalone()){sync();return;}\n'
+              '    if(deferredPrompt){\n'
+              '      deferredPrompt.prompt();\n'
+              '      try{\n'
+              '        const choice=await deferredPrompt.userChoice;\n'
+              "        if(m)m.textContent=choice?.outcome==='accepted'?'Pemasangan AVIA diterima.':'Pemasangan dibatalkan.';\n"
+              '      }catch(_){\n'
+              "        if(m)m.textContent='Gunakan menu Chrome → Install app / Add to Home screen.';\n"
+              '      }\n'
+              '      deferredPrompt=null;\n'
+              '    }else if(m){\n'
+              "      m.textContent='Buka menu Chrome (⋮) → Install app / Add to Home screen.';\n"
+              '    }\n'
+              '  });\n'
+              '  sync();\n'
+              '})();\n'
+              '</script>'
+          )
 
           if 'id="aviaAuthenticatedPwaInstall"' not in s:
               if '</body>' not in s:
@@ -107,10 +110,8 @@ jobs:
           p.write_text(s,encoding='utf-8')
           PY
 
-          # Force phones to receive the new authenticated Profile UI.
           sed -i "s/avia-web-v12/avia-web-v13/g; s/avia-web-v11/avia-web-v13/g; s/avia-web-v10/avia-web-v13/g" sw.js
 
-          # Do not allow this control to leak onto the public login screen.
           python3 - <<'PY'
           from pathlib import Path
           import re
