@@ -34,14 +34,22 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
           p=Path('index.html')
           s=p.read_text(encoding='utf-8')
 
+          # Hide biometric controls by default on web/PWA.
           s=s.replace(
               '<div id="biometricCard" class="card" style="margin-top:12px">',
               '<div id="biometricCard" class="card hidden" style="margin-top:12px">',
               1,
+          )
+          s=re.sub(
+              r'<button id="sessionBioBtn"(?![^>]*class=)([^>]*)>',
+              r'<button id="sessionBioBtn" class="hidden"\1>',
+              s,
+              count=1,
           )
 
           script='''<script id="aviaBiometricApkOnly">
@@ -53,18 +61,21 @@ jobs:
                 return false;
               }
             }
-            function syncBiometricCard(){
-              const card=document.getElementById('biometricCard');
-              if(!card)return;
-              card.classList.toggle('hidden',!nativeBiometricAvailable());
+            function syncBiometricUi(){
+              const available=nativeBiometricAvailable();
+              document.getElementById('biometricCard')?.classList.toggle('hidden',!available);
+              document.getElementById('sessionBioBtn')?.classList.toggle('hidden',!available);
             }
-            syncBiometricCard();
-            window.addEventListener('DOMContentLoaded',syncBiometricCard,{once:true});
-            window.addEventListener('pageshow',syncBiometricCard);
+            syncBiometricUi();
+            window.addEventListener('DOMContentLoaded',syncBiometricUi,{once:true});
+            window.addEventListener('pageshow',syncBiometricUi);
+            setTimeout(syncBiometricUi,250);
           })();
           </script>'''
 
-          if 'id="aviaBiometricApkOnly"' not in s:
+          if 'id="aviaBiometricApkOnly"' in s:
+              s=re.sub(r'<script id="aviaBiometricApkOnly">[\s\S]*?</script>',script,s,count=1)
+          else:
               if '</body>' not in s:
                   raise SystemExit('body closing tag not found')
               s=s.replace('</body>',script+'\n</body>',1)
@@ -72,11 +83,13 @@ jobs:
           p.write_text(s,encoding='utf-8')
           PY
 
-          sed -i "s/avia-web-v13/avia-web-v14/g; s/avia-web-v12/avia-web-v14/g; s/avia-web-v11/avia-web-v14/g" sw.js
+          sed -i "s/avia-web-v14/avia-web-v15/g; s/avia-web-v13/avia-web-v15/g; s/avia-web-v12/avia-web-v15/g; s/avia-web-v11/avia-web-v15/g" sw.js
 
           grep -q 'id="biometricCard" class="card hidden"' index.html
           grep -q 'id="aviaBiometricApkOnly"' index.html
+          grep -q 'sessionBioBtn' index.html
           grep -q 'AndroidBiometric.isAvailable' index.html
+          grep -q 'avia-web-v15' sw.js
 
       - name: Validate browser JavaScript before publishing
         shell: bash
