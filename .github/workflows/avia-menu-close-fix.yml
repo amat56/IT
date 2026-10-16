@@ -111,5 +111,5 @@ jobs:
           git config user.name 'AVIA UI Build'
           git config user.email 'actions@github.com'
           git add index.html sw.js
-          git commit -m 'Remove redundant Tutup Menu button'
+          git commit -m 'Repair AVIA blank screen and keep Tutup Menu removed'
           git push origin HEAD:avia-web-dist
