@@ -2484,8 +2484,6 @@ window.addEventListener('popstate',()=>{
   btn.onpointerup=openDrawerNow;
   btn.addEventListener('click',openDrawerNow,true);
   btn.addEventListener('touchend',openDrawerNow,{passive:false,capture:true});
-;
-  }
 
   // Dark backdrop closes drawer only when tapping outside panel.
   drawer.onclick=(ev)=>{
