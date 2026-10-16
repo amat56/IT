@@ -1,0 +1,110 @@
+name: AVIA Biometric APK Only
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/avia-biometric-apk-only.yml'
+  workflow_run:
+    workflows: ['AVIA Authenticated PWA Install']
+    types: [completed]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: avia-biometric-apk-only
+  cancel-in-progress: true
+
+jobs:
+  biometric-visibility:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout production branch
+        uses: actions/checkout@v4
+        with:
+          ref: avia-web-dist
+          fetch-depth: 0
+
+      - name: Keep biometric UI for APK only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+
+          # Hide the biometric card by default on web/PWA. The APK-specific
+          # AndroidBiometric bridge will reveal it again inside the Android app.
+          s=s.replace(
+              '<div id="biometricCard" class="card" style="margin-top:12px">',
+              '<div id="biometricCard" class="card hidden" style="margin-top:12px">',
+              1,
+          )
+
+          script='''<script id="aviaBiometricApkOnly">
+(function(){
+  function nativeBiometricAvailable(){
+    try{
+      return !!(window.AndroidBiometric && AndroidBiometric.isAvailable && AndroidBiometric.isAvailable());
+    }catch(_){
+      return false;
+    }
+  }
+  function syncBiometricCard(){
+    const card=document.getElementById('biometricCard');
+    if(!card)return;
+    card.classList.toggle('hidden',!nativeBiometricAvailable());
+  }
+  syncBiometricCard();
+  window.addEventListener('DOMContentLoaded',syncBiometricCard,{once:true});
+  window.addEventListener('pageshow',syncBiometricCard);
+})();
+</script>'''
+
+          if 'id="aviaBiometricApkOnly"' not in s:
+              if '</body>' not in s:
+                  raise SystemExit('body closing tag not found')
+              s=s.replace('</body>',script+'\n</body>',1)
+
+          p.write_text(s,encoding='utf-8')
+          PY
+
+          sed -i "s/avia-web-v13/avia-web-v14/g; s/avia-web-v12/avia-web-v14/g; s/avia-web-v11/avia-web-v14/g" sw.js
+
+          grep -q 'id="biometricCard" class="card hidden"' index.html
+          grep -q 'id="aviaBiometricApkOnly"' index.html
+          grep -q 'AndroidBiometric.isAvailable' index.html
+
+      - name: Validate browser JavaScript before publishing
+        shell: bash
+        run: |
+          node <<'JS'
+          const fs=require('fs');
+          const vm=require('vm');
+          const html=fs.readFileSync('index.html','utf8');
+          let count=0;
+          for(const match of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)){
+            new vm.Script(match[1],{filename:'inline-'+(++count)+'.js'});
+          }
+          if(!count)throw new Error('No browser scripts found');
+          console.log(count+' browser scripts passed syntax validation');
+          JS
+
+      - name: Publish biometric visibility fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo 'Biometric visibility already correct.'
+            exit 0
+          fi
+          git config user.name 'AVIA UI Build'
+          git config user.email 'actions@github.com'
+          git add index.html sw.js
+          git commit -m 'Show biometric controls only inside Android APK'
+          git push origin HEAD:avia-web-dist
