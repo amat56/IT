@@ -52,13 +52,18 @@ jobs:
           # Remove the old direct handler so deleting the button cannot cause a JS error.
           s=s.replace(";g('closeMenu').onclick=()=>g('drawer').classList.add('hidden');", ";")
 
-          # Remove the older optional drawer-close compatibility block.
+          # Remove the complete legacy block using the next comment as a boundary.
+          # Matching the first closing brace truncates the nested event handler.
           s=re.sub(
-              r'\n\s*// Drawer close remains explicit\.\s*\n\s*if\(g\(\'closeMenu\'\)\)\{.*?\n\s*\}\s*',
+              r'\n[ \t]*// Drawer close remains explicit\.[\s\S]*?(?=\n[ \t]*// Dark backdrop closes drawer)',
               '\n',
               s,
               count=1,
-              flags=re.S,
+          )
+          # Repair the exact orphan left by the previous cleanup on existing builds.
+          s=s.replace(
+              "btn.addEventListener('touchend',openDrawerNow,{passive:false,capture:true});\n;\n  }",
+              "btn.addEventListener('touchend',openDrawerNow,{passive:false,capture:true});",
           )
 
           # Remove the dedicated close-menu patch script added previously.
@@ -74,11 +79,26 @@ jobs:
           PY
 
           # Bust PWA cache so the simplified drawer appears immediately.
-          sed -i "s/avia-web-v10/avia-web-v11/g; s/avia-web-v9/avia-web-v11/g; s/avia-web-v8/avia-web-v11/g; s/avia-web-v7/avia-web-v11/g" sw.js
+          sed -i "s/avia-web-v11/avia-web-v12/g; s/avia-web-v10/avia-web-v12/g; s/avia-web-v9/avia-web-v12/g; s/avia-web-v8/avia-web-v12/g; s/avia-web-v7/avia-web-v12/g" sw.js
 
           ! grep -q 'id="closeMenu"' index.html
           ! grep -q 'aviaCloseMenuFix' index.html
-          grep -q 'avia-web-v11' sw.js
+          grep -q 'avia-web-v12' sw.js
+
+      - name: Validate browser JavaScript before publishing
+        shell: bash
+        run: |
+          node <<'JS'
+          const fs = require('fs');
+          const vm = require('vm');
+          const html = fs.readFileSync('index.html', 'utf8');
+          let count = 0;
+          for (const match of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) {
+            new vm.Script(match[1], {filename: 'inline-' + (++count) + '.js'});
+          }
+          if (!count) throw new Error('No browser scripts found');
+          console.log(count + ' browser scripts passed syntax validation');
+          JS
 
       - name: Publish menu cleanup
         shell: bash
