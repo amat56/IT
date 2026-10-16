@@ -38,8 +38,6 @@ jobs:
           p=Path('index.html')
           s=p.read_text(encoding='utf-8')
 
-          # Hide the biometric card by default on web/PWA. The APK-specific
-          # AndroidBiometric bridge will reveal it again inside the Android app.
           s=s.replace(
               '<div id="biometricCard" class="card" style="margin-top:12px">',
               '<div id="biometricCard" class="card hidden" style="margin-top:12px">',
@@ -47,24 +45,24 @@ jobs:
           )
 
           script='''<script id="aviaBiometricApkOnly">
-(function(){
-  function nativeBiometricAvailable(){
-    try{
-      return !!(window.AndroidBiometric && AndroidBiometric.isAvailable && AndroidBiometric.isAvailable());
-    }catch(_){
-      return false;
-    }
-  }
-  function syncBiometricCard(){
-    const card=document.getElementById('biometricCard');
-    if(!card)return;
-    card.classList.toggle('hidden',!nativeBiometricAvailable());
-  }
-  syncBiometricCard();
-  window.addEventListener('DOMContentLoaded',syncBiometricCard,{once:true});
-  window.addEventListener('pageshow',syncBiometricCard);
-})();
-</script>'''
+          (function(){
+            function nativeBiometricAvailable(){
+              try{
+                return !!(window.AndroidBiometric && AndroidBiometric.isAvailable && AndroidBiometric.isAvailable());
+              }catch(_){
+                return false;
+              }
+            }
+            function syncBiometricCard(){
+              const card=document.getElementById('biometricCard');
+              if(!card)return;
+              card.classList.toggle('hidden',!nativeBiometricAvailable());
+            }
+            syncBiometricCard();
+            window.addEventListener('DOMContentLoaded',syncBiometricCard,{once:true});
+            window.addEventListener('pageshow',syncBiometricCard);
+          })();
+          </script>'''
 
           if 'id="aviaBiometricApkOnly"' not in s:
               if '</body>' not in s:
