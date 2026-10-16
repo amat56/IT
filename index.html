@@ -786,6 +786,13 @@ header .headerLeftBrand{
   </div>
 </div>
 
+<div id="profileInstallPwaCard" class="card">
+  <h3 style="margin-top:0">📲 Pasang AVIA</h3>
+  <div class="note">Pasang AVIA pada skrin utama telefon untuk akses lebih cepat. Pilihan ini hanya tersedia selepas anda log masuk.</div>
+  <button id="profileInstallPwaBtn" type="button" style="width:100%;margin-top:10px">Pasang AVIA</button>
+  <div id="profileInstallPwaMsg" class="muted" style="margin-top:8px"></div>
+</div>
+
 <div id="biometricCard" class="card" style="margin-top:12px">
   <h3 style="margin-top:0">Login Biometrik</h3>
   <div class="note">Selepas login biasa, anda boleh aktifkan cap jari/biometrik untuk membuka AVIA dengan lebih cepat. ID & password kekal sebagai kaedah sandaran.</div>
@@ -3008,6 +3015,52 @@ if(standalone())b()?.classList.add('hidden');
   if(!app||!jata)return;
   const sync=()=>jata.classList.toggle('hidden',app.classList.contains('hidden'));
   new MutationObserver(sync).observe(app,{attributes:true,attributeFilter:['class']});
+  sync();
+})();
+</script>
+<script id="aviaAuthenticatedPwaInstall">
+(function(){
+  let deferredPrompt=null;
+  const btn=()=>document.getElementById('profileInstallPwaBtn');
+  const msg=()=>document.getElementById('profileInstallPwaMsg');
+  const standalone=()=>window.matchMedia?.('(display-mode: standalone)').matches||window.navigator.standalone===true;
+  const sync=()=>{
+    const b=btn(),m=msg();
+    if(!b)return;
+    if(standalone()){
+      b.classList.add('hidden');
+      if(m)m.textContent='✓ AVIA sudah dipasang pada peranti ini.';
+    }else{
+      b.classList.remove('hidden');
+      if(m&&!m.textContent)m.textContent='Jika prompt tidak keluar, buka menu Chrome dan pilih Install app / Add to Home screen.';
+    }
+  };
+  window.addEventListener('beforeinstallprompt',e=>{
+    e.preventDefault();
+    deferredPrompt=e;
+    sync();
+  });
+  window.addEventListener('appinstalled',()=>{
+    deferredPrompt=null;
+    sync();
+  });
+  document.addEventListener('click',async e=>{
+    if(e.target?.id!=='profileInstallPwaBtn')return;
+    const m=msg();
+    if(standalone()){sync();return;}
+    if(deferredPrompt){
+      deferredPrompt.prompt();
+      try{
+        const choice=await deferredPrompt.userChoice;
+        if(m)m.textContent=choice?.outcome==='accepted'?'Pemasangan AVIA diterima.':'Pemasangan dibatalkan.';
+      }catch(_){
+        if(m)m.textContent='Gunakan menu Chrome → Install app / Add to Home screen.';
+      }
+      deferredPrompt=null;
+    }else if(m){
+      m.textContent='Buka menu Chrome (⋮) → Install app / Add to Home screen.';
+    }
+  });
   sync();
 })();
 </script>
