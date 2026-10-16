@@ -793,7 +793,7 @@ header .headerLeftBrand{
   <div id="profileInstallPwaMsg" class="muted" style="margin-top:8px"></div>
 </div>
 
-<div id="biometricCard" class="card" style="margin-top:12px">
+<div id="biometricCard" class="card hidden" style="margin-top:12px">
   <h3 style="margin-top:0">Login Biometrik</h3>
   <div class="note">Selepas login biasa, anda boleh aktifkan cap jari/biometrik untuk membuka AVIA dengan lebih cepat. ID & password kekal sebagai kaedah sandaran.</div>
   <div id="biometricStatus" class="muted" style="margin:10px 0">Belum diaktifkan</div>
@@ -3062,6 +3062,25 @@ if(standalone())b()?.classList.add('hidden');
     }
   });
   sync();
+})();
+</script>
+<script id="aviaBiometricApkOnly">
+(function(){
+  function nativeBiometricAvailable(){
+    try{
+      return !!(window.AndroidBiometric && AndroidBiometric.isAvailable && AndroidBiometric.isAvailable());
+    }catch(_){
+      return false;
+    }
+  }
+  function syncBiometricCard(){
+    const card=document.getElementById('biometricCard');
+    if(!card)return;
+    card.classList.toggle('hidden',!nativeBiometricAvailable());
+  }
+  syncBiometricCard();
+  window.addEventListener('DOMContentLoaded',syncBiometricCard,{once:true});
+  window.addEventListener('pageshow',syncBiometricCard);
 })();
 </script>
 </body></html>
