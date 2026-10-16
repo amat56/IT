@@ -823,7 +823,7 @@ header .headerLeftBrand{
 </div>
 
 
-<div id="sessionLock" class="lock-overlay hidden"><div style="max-width:360px;width:100%"><div style="font-size:34px;font-weight:800;letter-spacing:.12em">AVIA</div><div style="font-size:50px;margin:22px 0 10px">🔒</div><h3>Sesi Dikunci</h3><p style="font-size:13px;opacity:.9">AVIA dikunci selepas 15 minit tidak aktif.</p><button id="sessionBioBtn" style="width:100%;background:white;color:#0b4f8a">Buka dengan Biometrik</button><button id="sessionLoginBtn" class="alt" style="width:100%;margin-top:8px">Guna ID & Password</button></div></div>
+<div id="sessionLock" class="lock-overlay hidden"><div style="max-width:360px;width:100%"><div style="font-size:34px;font-weight:800;letter-spacing:.12em">AVIA</div><div style="font-size:50px;margin:22px 0 10px">🔒</div><h3>Sesi Dikunci</h3><p style="font-size:13px;opacity:.9">AVIA dikunci selepas 15 minit tidak aktif.</p><button id="sessionBioBtn" class="hidden" style="width:100%;background:white;color:#0b4f8a">Buka dengan Biometrik</button><button id="sessionLoginBtn" class="alt" style="width:100%;margin-top:8px">Guna ID & Password</button></div></div>
 <div id="biometricLock" class="hidden" style="position:fixed;inset:0;background:linear-gradient(160deg,#08345c,#1282e4);z-index:100;display:flex;align-items:center;justify-content:center;padding:24px;color:white;text-align:center">
   <div style="max-width:360px;width:100%">
     <div style="font-size:34px;font-weight:800;letter-spacing:.12em">AVIA</div>
@@ -3073,14 +3073,15 @@ if(standalone())b()?.classList.add('hidden');
       return false;
     }
   }
-  function syncBiometricCard(){
-    const card=document.getElementById('biometricCard');
-    if(!card)return;
-    card.classList.toggle('hidden',!nativeBiometricAvailable());
+  function syncBiometricUi(){
+    const available=nativeBiometricAvailable();
+    document.getElementById('biometricCard')?.classList.toggle('hidden',!available);
+    document.getElementById('sessionBioBtn')?.classList.toggle('hidden',!available);
   }
-  syncBiometricCard();
-  window.addEventListener('DOMContentLoaded',syncBiometricCard,{once:true});
-  window.addEventListener('pageshow',syncBiometricCard);
+  syncBiometricUi();
+  window.addEventListener('DOMContentLoaded',syncBiometricUi,{once:true});
+  window.addEventListener('pageshow',syncBiometricUi);
+  setTimeout(syncBiometricUi,250);
 })();
 </script>
 </body></html>
