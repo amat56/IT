@@ -1,0 +1,156 @@
+name: AVIA Authenticated PWA Install
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/avia-profile-pwa-install.yml'
+  workflow_run:
+    workflows: ['AVIA Menu Cleanup']
+    types: [completed]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: avia-profile-pwa-install
+  cancel-in-progress: true
+
+jobs:
+  add-profile-install:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout production branch
+        uses: actions/checkout@v4
+        with:
+          ref: avia-web-dist
+          fetch-depth: 0
+
+      - name: Add install control inside authenticated Profile only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+
+          card='''<div id="profileInstallPwaCard" class="card">
+  <h3 style="margin-top:0">📲 Pasang AVIA</h3>
+  <div class="note">Pasang AVIA pada skrin utama telefon untuk akses lebih cepat. Pilihan ini hanya tersedia selepas anda log masuk.</div>
+  <button id="profileInstallPwaBtn" type="button" style="width:100%;margin-top:10px">Pasang AVIA</button>
+  <div id="profileInstallPwaMsg" class="muted" style="margin-top:8px"></div>
+</div>
+'''
+
+          if 'id="profileInstallPwaCard"' not in s:
+              marker='<div id="biometricCard" class="card" style="margin-top:12px">'
+              if marker not in s:
+                  raise SystemExit('Profile biometric marker not found')
+              s=s.replace(marker,card+'\n'+marker,1)
+
+          script='''<script id="aviaAuthenticatedPwaInstall">
+(function(){
+  let deferredPrompt=null;
+  const btn=()=>document.getElementById('profileInstallPwaBtn');
+  const msg=()=>document.getElementById('profileInstallPwaMsg');
+  const standalone=()=>window.matchMedia?.('(display-mode: standalone)').matches||window.navigator.standalone===true;
+  const sync=()=>{
+    const b=btn(),m=msg();
+    if(!b)return;
+    if(standalone()){
+      b.classList.add('hidden');
+      if(m)m.textContent='✓ AVIA sudah dipasang pada peranti ini.';
+    }else{
+      b.classList.remove('hidden');
+      if(m&&!m.textContent)m.textContent='Jika prompt tidak keluar, buka menu Chrome dan pilih “Install app” / “Add to Home screen”.';
+    }
+  };
+  window.addEventListener('beforeinstallprompt',e=>{
+    e.preventDefault();
+    deferredPrompt=e;
+    sync();
+  });
+  window.addEventListener('appinstalled',()=>{
+    deferredPrompt=null;
+    sync();
+  });
+  document.addEventListener('click',async e=>{
+    if(e.target?.id!=='profileInstallPwaBtn')return;
+    const m=msg();
+    if(standalone()){sync();return;}
+    if(deferredPrompt){
+      deferredPrompt.prompt();
+      try{
+        const choice=await deferredPrompt.userChoice;
+        if(m)m.textContent=choice?.outcome==='accepted'?'Pemasangan AVIA diterima.':'Pemasangan dibatalkan.';
+      }catch(_){
+        if(m)m.textContent='Gunakan menu Chrome → Install app / Add to Home screen.';
+      }
+      deferredPrompt=null;
+    }else if(m){
+      m.textContent='Buka menu Chrome (⋮) → Install app / Add to Home screen.';
+    }
+  });
+  sync();
+})();
+</script>'''
+
+          if 'id="aviaAuthenticatedPwaInstall"' not in s:
+              if '</body>' not in s:
+                  raise SystemExit('body closing tag not found')
+              s=s.replace('</body>',script+'\n</body>',1)
+
+          p.write_text(s,encoding='utf-8')
+          PY
+
+          # Force phones to receive the new authenticated Profile UI.
+          sed -i "s/avia-web-v12/avia-web-v13/g; s/avia-web-v11/avia-web-v13/g; s/avia-web-v10/avia-web-v13/g" sw.js
+
+          # Do not allow this control to leak onto the public login screen.
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          s=Path('index.html').read_text(encoding='utf-8')
+          login=re.search(r'<section id="loginView"[\s\S]*?</section>',s)
+          if not login:
+              raise SystemExit('login section not found')
+          if 'profileInstallPwaBtn' in login.group(0) or 'profileInstallPwaCard' in login.group(0):
+              raise SystemExit('Install control leaked into public login')
+          if 'id="profileInstallPwaBtn"' not in s:
+              raise SystemExit('Authenticated install button missing')
+          if 'id="aviaAuthenticatedPwaInstall"' not in s:
+              raise SystemExit('Authenticated install handler missing')
+          PY
+
+      - name: Validate browser JavaScript before publishing
+        shell: bash
+        run: |
+          node <<'JS'
+          const fs=require('fs');
+          const vm=require('vm');
+          const html=fs.readFileSync('index.html','utf8');
+          let count=0;
+          for(const match of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)){
+            new vm.Script(match[1],{filename:'inline-'+(++count)+'.js'});
+          }
+          if(!count)throw new Error('No browser scripts found');
+          console.log(count+' browser scripts passed syntax validation');
+          JS
+
+      - name: Publish authenticated install control
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo 'Authenticated install control already present.'
+            exit 0
+          fi
+          git config user.name 'AVIA UI Build'
+          git config user.email 'actions@github.com'
+          git add index.html sw.js
+          git commit -m 'Add Pasang AVIA to authenticated Profile'
+          git push origin HEAD:avia-web-dist
