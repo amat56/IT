@@ -1,0 +1,116 @@
+name: AVIA Menu Guide and Simulations
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/avia-menu-guide.yml'
+      - '.github/avia-guide/**'
+  workflow_run:
+    workflows: ['AVIA Biometric APK Only']
+    types: [completed]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: avia-menu-guide
+  cancel-in-progress: true
+
+jobs:
+  publish-guide:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout hardened production
+        uses: actions/checkout@v4
+        with:
+          ref: avia-web-dist
+          path: dist
+          fetch-depth: 0
+
+      - name: Checkout maintained guide
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: source
+
+      - name: Install safe guide and refresh offline cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/assets
+          cp source/.github/avia-guide/avia-guide.js dist/assets/avia-guide.js
+          cd dist
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import subprocess
+
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          ref='<script defer src="assets/avia-guide.js"></script>'
+          if ref not in s:
+              if '</body>' not in s:
+                  raise SystemExit('Closing body not found')
+              s=s.replace('</body>',ref+'\n</body>',1)
+              p.write_text(s,encoding='utf-8')
+
+          sw_path=Path('sw.js')
+          sw=sw_path.read_text(encoding='utf-8')
+          m=re.search(r"avia-web-v(\d+)",sw)
+          if not m:
+              raise SystemExit('PWA cache version marker missing')
+          if "'./assets/avia-guide.js'" not in sw:
+              if "'./icons/icon-512.png'" not in sw:
+                  raise SystemExit('PWA shell marker missing')
+              sw=sw.replace("'./icons/icon-512.png'","'./icons/icon-512.png','./assets/avia-guide.js'",1)
+          changed=bool(subprocess.run(['git','status','--porcelain'],capture_output=True,text=True).stdout.strip())
+          if changed:
+              n=max(int(m.group(1))+1,16)
+              sw=re.sub(r"avia-web-v\d+","avia-web-v"+str(n),sw)
+          sw_path.write_text(sw,encoding='utf-8')
+          PY
+          test "$(grep -c 'src="assets/avia-guide.js"' index.html)" -eq 1
+          ! sed -n '/<section id="loginView"/,/<\/section>/p' index.html | grep -q 'avia-guide.js'
+          test -s assets/avia-guide.js
+          grep -q 'Panduan & Simulasi' assets/avia-guide.js
+
+      - name: Validate JS and security boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          node --check assets/avia-guide.js
+          node <<'JS'
+          const fs=require('fs');
+          const vm=require('vm');
+          const html=fs.readFileSync('index.html','utf8');
+          let count=0;
+          for(const match of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)){
+            if(match[1].trim())new vm.Script(match[1],{filename:'inline-'+(++count)+'.js'});
+          }
+          if(!count)throw Error('No browser scripts found');
+          console.log(count+' inline scripts passed');
+          JS
+          if grep -q 'P@ss1234' index.html; then exit 1; fi
+          grep -q 'Akses staf sahaja' index.html
+          grep -q 'aviaBiometricApkOnly' index.html
+          grep -q 'profileInstallPwaBtn' index.html
+          grep -q 'assets/jata-negara.png' index.html
+
+      - name: Publish authenticated menu guide
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          if git diff --quiet && test -z "$(git status --porcelain)"; then
+            echo 'Menu guide is already current.'
+            exit 0
+          fi
+          git config user.name 'AVIA UI Build'
+          git config user.email 'actions@github.com'
+          git add index.html sw.js assets/avia-guide.js
+          git commit -m 'Add read-only guide covering all AVIA menus'
+          git push origin HEAD:avia-web-dist
