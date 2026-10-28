@@ -78,6 +78,29 @@ jobs:
           grep -q "const people=sortAviaStaff(groups\[u\])" extracted/AVIA-Android-v6_9bi/app/src/main/assets/index.html
           grep -Fq "const arr=sortAviaStaff(groups[type]||[]);" extracted/AVIA-Android-v6_9bi/app/src/main/assets/index.html
 
+      - name: Add safe AVIA menu tour to APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .guide-src
+          # The guide source is maintained on main; never include live account data in samples.
+          curl --fail --location --retry 3 --connect-timeout 15 'https://raw.githubusercontent.com/amat56/IT/main/.github/avia-guide/avia-guide.js' --output .guide-src/avia-guide.js
+          test -s .guide-src/avia-guide.js
+          mkdir -p extracted/AVIA-Android-v6_9bi/app/src/main/assets/assets
+          cp .guide-src/avia-guide.js extracted/AVIA-Android-v6_9bi/app/src/main/assets/assets/avia-guide.js
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('extracted/AVIA-Android-v6_9bi/app/src/main/assets/index.html')
+          s=p.read_text(encoding='utf-8')
+          ref='<script defer src="assets/avia-guide.js"></script>'
+          if ref not in s:
+              if '</body>' not in s: raise SystemExit('Missing app closing body tag')
+              s=s.replace('</body>',ref+'\n</body>',1)
+              p.write_text(s,encoding='utf-8')
+          PY
+          node --check extracted/AVIA-Android-v6_9bi/app/src/main/assets/assets/avia-guide.js
+          grep -q 'src="assets/avia-guide.js"' extracted/AVIA-Android-v6_9bi/app/src/main/assets/index.html
+
       - name: Build APK
         run: |
           cd extracted/AVIA-Android-v6_9bi
